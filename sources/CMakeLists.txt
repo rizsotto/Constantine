@@ -1,31 +1,21 @@
-set(SYMBOL_FILE PrintFunctionNames.exports)
+set(ourlib_target FindConstCandidates)
 
-set (CLANG_LIBS
-	libclang
-	clangFrontend
-	clangAST
-	clangAnalysis
-	clangBasic
-	clangCodeGen
-	clangDriver
-	clangFrontendTool
-	clangIndex
-	clangLex
-	clangParse
-	clangRewrite
-	clangSema
-	clangSerialization
-	clangStaticAnalyzerCheckers
-	clangStaticAnalyzerCore
-	clangStaticAnalyzerFrontend
+set(ourlib_sources
+    PrintFunctionNames.cpp
 )
 
-set (USER_LIBS
-	pthread
-)
+set(ourlib_symbols PrintFunctionNames.exports)
 
-add_clang_plugin(PrintFunctionNames PrintFunctionNames.cpp)
 
-set_target_properties(PrintFunctionNames PROPERTIES
-	LINKER_LANGUAGE CXX
-	PREFIX "")
+add_library(${ourlib_target} SHARED ${ourlib_sources})
+
+include_directories(${CLANG_INCLUDE_DIRS})
+target_link_libraries(${ourlib_target} ${CLANG_LIBRARIES})
+add_definitions(${CLANG_DEFINES})
+
+set_target_properties(${ourlib_target} PROPERTIES
+    LINKER_LANGUAGE CXX)
+set_target_properties(${ourlib_target} PROPERTIES
+    PREFIX "lib")
+set_target_properties(${ourlib_target} PROPERTIES
+    LINK_FlAGS "-exported_symbols_list ${ourlib_symbols}")
