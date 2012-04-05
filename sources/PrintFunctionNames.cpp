@@ -12,6 +12,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "clang/Basic/SourceLocation.h"
 #include "clang/Frontend/FrontendPluginRegistry.h"
 #include "clang/AST/ASTConsumer.h"
 #include "clang/AST/AST.h"
@@ -22,14 +23,24 @@ using namespace clang;
 namespace {
 
 class PrintFunctionsConsumer : public ASTConsumer {
+  SourceManager const & m_sm;
+
 public:
+  PrintFunctionsConsumer( SourceManager const & sm )
+  : m_sm(sm)
+  { }
+
   virtual bool HandleTopLevelDecl(DeclGroupRef DG) {
     for (DeclGroupRef::iterator i = DG.begin(), e = DG.end(); i != e; ++i) {
       const Decl *D = *i;
       if (const NamedDecl *ND = dyn_cast<NamedDecl>(D))
-        llvm::errs() << "top-level-decl: \"" << ND->getNameAsString() << "\"\n";
+      {
+        SourceLocation const & loc = ND->getLocation();
+        llvm::errs() << "top-level-decl: \"" << ND->getName() << "\" at ";
+        loc.print(llvm::errs(), m_sm);
+        llvm::errs() << "\n";
+      }
     }
-
     return true;
   }
 };
@@ -37,7 +48,7 @@ public:
 class PrintFunctionNamesAction : public PluginASTAction {
 protected:
   ASTConsumer *CreateASTConsumer(CompilerInstance &CI, llvm::StringRef) {
-    return new PrintFunctionsConsumer();
+    return new PrintFunctionsConsumer(CI.getSourceManager());
   }
 
   bool ParseArgs(const CompilerInstance &CI,
