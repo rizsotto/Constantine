@@ -1,10 +1,12 @@
+# Copyright 2011 by Laszlo Nagy [see file LICENSE.TXT]
+
 set(ourlib_target FindConstCandidates)
 
 set(ourlib_sources
-    PrintFunctionNames.cpp
+    PluginMain.cpp
 )
 
-set(ourlib_symbols PrintFunctionNames.exports)
+set(ourlib_symbols ExportedSymbolsList)
 
 
 add_library(${ourlib_target} SHARED ${ourlib_sources})

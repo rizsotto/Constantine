@@ -1,3 +1,5 @@
+# Copyright 2011 by Laszlo Nagy [see file LICENSE.TXT]
+
 # input:
 #   LLVM_SRC_DIR    - where are the llvm sources
 #   LLVM_BUILD_DIR  - where are the llvm libs
