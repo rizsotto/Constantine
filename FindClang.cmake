@@ -1,6 +1,10 @@
-
-#set(LLVM_SRC_DIR /home/laszlona/Programming/llvm.from.svn)
-#set(LLVM_BUILD_DIR "${LLVM_SRC_DIR}/build")
+# input:
+#   LLVM_SRC_DIR    - where are the llvm sources
+#   LLVM_BUILD_DIR  - where are the llvm libs
+# output:
+#   CLANG_FOUND
+#   CLANG_INCLUDE_DIRS
+#   CLANG_DEFINES
 
 set(CLANG_SRC_DIR "${LLVM_SRC_DIR}/tools/clang")
 set(CLANG_BUILD_DIR "${LLVM_BUILD_DIR}/tools/clang")
@@ -10,57 +14,15 @@ set(include_search_path ${include_search_path} "${CLANG_SRC_DIR}/include")
 set(include_search_path ${include_search_path} "${LLVM_BUILD_DIR}/include")
 set(include_search_path ${include_search_path} "${CLANG_BUILD_DIR}/include")
 
+set(clang_cflags ${clang_cflags} -D_GNU_SOURCE)
 set(clang_cflags ${clang_cflags} -D__STDC_LIMIT_MACROS)
 set(clang_cflags ${clang_cflags} -D__STDC_CONSTANT_MACROS)
-set(clang_cflags ${clang_cflags} -D_GNU_SOURCE)
 set(clang_cflags ${clang_cflags} -DHAVE_CLANG_CONFIG_H)
+set(clang_cflags ${clang_cflags} -fno-rtti)
 
 set(lib_search_dir "${LLVM_BUILD_DIR}/lib")
-
-#FIND_LIBRARY(LLVMJIT_LIB LLVMJIT ${lib_search_dir})
-#FIND_LIBRARY(LLVMX86CodeGen_LIB LLVMX86CodeGen ${lib_search_dir})
-#FIND_LIBRARY(LLVMX86AsmParser_LIB LLVMX86AsmParser ${lib_search_dir})
-#FIND_LIBRARY(LLVMX86Disassembler_LIB LLVMX86Disassembler ${lib_search_dir})
-#FIND_LIBRARY(LLVMExecutionEngine_LIB LLVMExecutionEngine ${lib_search_dir})
-#FIND_LIBRARY(LLVMAsmPrinter_LIB LLVMAsmPrinter ${lib_search_dir})
-#FIND_LIBRARY(LLVMSelectionDAG_LIB LLVMSelectionDAG ${lib_search_dir})
-#FIND_LIBRARY(LLVMX86AsmPrinter_LIB LLVMX86AsmPrinter ${lib_search_dir})
-#FIND_LIBRARY(LLVMX86Info_LIB LLVMX86Info ${lib_search_dir})
-#FIND_LIBRARY(LLVMMCParser_LIB LLVMMCParser ${lib_search_dir})
-#FIND_LIBRARY(LLVMCodeGen_LIB LLVMCodeGen ${lib_search_dir})
-#FIND_LIBRARY(LLVMX86Utils_LIB LLVMX86Utils ${lib_search_dir})
-#FIND_LIBRARY(LLVMScalarOpts_LIB LLVMScalarOpts ${lib_search_dir})
-#FIND_LIBRARY(LLVMInstCombine_LIB LLVMInstCombine ${lib_search_dir})
-#FIND_LIBRARY(LLVMTransformUtils_LIB LLVMTransformUtils ${lib_search_dir})
-#FIND_LIBRARY(LLVMipa_LIB LLVMipa ${lib_search_dir})
-#FIND_LIBRARY(LLVMAnalysis_LIB LLVMAnalysis ${lib_search_dir})
-#FIND_LIBRARY(LLVMTarget_LIB LLVMTarget ${lib_search_dir})
-#FIND_LIBRARY(LLVMCore_LIB LLVMCore ${lib_search_dir})
-#FIND_LIBRARY(LLVMMC_LIB LLVMMC ${lib_search_dir})
-#FIND_LIBRARY(LLVMSupport_LIB LLVMSupport ${lib_search_dir})
-FIND_LIBRARY(libclang_LIB libclang ${lib_search_dir})
-FIND_LIBRARY(clangFrontend_LIB clangFrontend ${lib_search_dir})
-FIND_LIBRARY(clangAST_LIB clangAST ${lib_search_dir})
-#FIND_LIBRARY(clangAnalysis ${lib_search_dir})
-#FIND_LIBRARY(clangBasic ${lib_search_dir})
-#FIND_LIBRARY(clangCodeGen ${lib_search_dir})
-#FIND_LIBRARY(clangDriver ${lib_search_dir})
-#FIND_LIBRARY(clangFrontendTool ${lib_search_dir})
-#FIND_LIBRARY(clangIndex ${lib_search_dir})
-#FIND_LIBRARY(clangLex ${lib_search_dir})
-#FIND_LIBRARY(clangParse ${lib_search_dir})
-#FIND_LIBRARY(clangRewrite ${lib_search_dir})
-#FIND_LIBRARY(clangSema ${lib_search_dir})
-#FIND_LIBRARY(clangSerialization ${lib_search_dir})
-#FIND_LIBRARY(clangStaticAnalyzerCheckers ${lib_search_dir})
-#FIND_LIBRARY(clangStaticAnalyzerCore ${lib_search_dir})
-#FIND_LIBRARY(clangStaticAnalyzerFrontend ${lib_search_dir})
 
 set(CLANG_FOUND 1)
 set(CLANG_INCLUDE_DIRS  ${include_search_path})
 set(CLANG_DEFINES       ${clang_cflags})
-
-set(CLANG_LIBRARIES     ${CLANG_LIBRARIES} ${libclang_LIB})
-set(CLANG_LIBRARIES     ${CLANG_LIBRARIES} ${clangFrontend_LIB})
-set(CLANG_LIBRARIES     ${CLANG_LIBRARIES} ${clangAST_LIB})
 
