@@ -19,17 +19,30 @@ public:
         : m_sm (sm)
     { }
 
+    static bool is_builtin(clang::NamedDecl const * decl)
+    {
+        clang::IdentifierInfo const * const id = decl->getIdentifier();
+        return (id->isStr("__va_list_tag") || id->isStr("__builtin_va_list"));
+    }
+
+    void report_decl(clang::NamedDecl const * decl)
+    {
+        clang::SourceLocation const & loc = decl->getLocation();
+        llvm::errs() << "top-level-decl: \"" << decl->getName() << "\" at ";
+        loc.print (llvm::errs(), m_sm);
+        llvm::errs() << "\n";
+    }
+
     virtual bool HandleTopLevelDecl(clang::DeclGroupRef gd)
     {
         for (clang::DeclGroupRef::iterator it = gd.begin(), e = gd.end(); it != e; ++it)
         {
-            clang::Decl const * const current = *it;
-            if (clang::NamedDecl const * found = clang::dyn_cast<clang::NamedDecl>(current) )
+            if (clang::NamedDecl const * const current = clang::dyn_cast<clang::NamedDecl>(*it))
             {
-                clang::SourceLocation const & loc = found->getLocation();
-                llvm::errs() << "top-level-decl: \"" << found->getName() << "\" at ";
-                loc.print (llvm::errs(), m_sm);
-                llvm::errs() << "\n";
+                if (! is_builtin(current))
+                {
+                    report_decl(current);
+                }
             }
         }
         return true;
