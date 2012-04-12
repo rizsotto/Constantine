@@ -4,11 +4,12 @@
 #include "clang/Frontend/FrontendPluginRegistry.h"
 #include "clang/AST/ASTConsumer.h"
 #include "clang/AST/AST.h"
+#include "clang/AST/Stmt.h"
 #include "clang/Frontend/CompilerInstance.h"
 #include "llvm/Support/raw_ostream.h"
 
-#include <algorithm>
-#include <boost/bind.hpp>
+#include <queue>
+#include <iterator>
 
 namespace
 {
@@ -19,24 +20,63 @@ public:
     ASTConsumer()
     { }
 
-    static bool is_builtin(clang::NamedDecl const * decl)
+    static bool isBuiltin(clang::NamedDecl const * decl)
     {
         clang::IdentifierInfo const * const id = decl->getIdentifier();
         return (id) && (id->isStr("__va_list_tag") || id->isStr("__builtin_va_list"));
     }
 
-    virtual bool HandleTopLevelDecl(clang::DeclGroupRef gd)
-    {
-        for (clang::DeclGroupRef::iterator it = gd.begin(), e = gd.end(); it != e; ++it)
-        {
-            if (clang::NamedDecl const * const current = clang::dyn_cast<clang::NamedDecl>(*it))
-            {
-                if (! is_builtin(current))
-                {
-                    clang::PrintingPolicy pp(current->getASTContext().getLangOpts());
-                    pp.Dump = true;
+    static void findConstCast(clang::Stmt const * Current) {
+        std::deque<const clang::Stmt *> WorkList;
+        std::back_insert_iterator<std::deque<const clang::Stmt *> > Inserter(WorkList);
 
-                    current->print(llvm::errs(), pp);
+        *Inserter++ = Current;
+
+        while (! WorkList.empty()) {
+            clang::Stmt const * const Head = WorkList.front();
+            WorkList.pop_front();
+
+            switch (Head->getStmtClass()) {
+            case clang::Stmt::BlockExprClass: {
+                clang::BlockExpr const * const B = clang::cast<clang::BlockExpr>(Head);
+                *Inserter++ = B->getBody();
+                break;
+            }
+            case clang::Stmt::CStyleCastExprClass:
+            case clang::Stmt::CXXFunctionalCastExprClass:
+            case clang::Stmt::CXXConstCastExprClass:
+            case clang::Stmt::CXXDynamicCastExprClass:
+            case clang::Stmt::CXXReinterpretCastExprClass:
+            case clang::Stmt::CXXStaticCastExprClass: {
+                Head->dump();
+                break;
+            }
+            default:
+                std::copy(Head->child_begin(), Head->child_end(), Inserter);
+                break;
+            }
+        }
+    }
+
+    static void dump(clang::Decl const * const Current) {
+        clang::PrintingPolicy DumpPolicy(Current->getASTContext().getLangOpts());
+        DumpPolicy.Dump = true;
+        Current->print(llvm::errs(), DumpPolicy);
+    }
+
+    virtual bool HandleTopLevelDecl(clang::DeclGroupRef gd) {
+        for (clang::DeclGroupRef::iterator It = gd.begin(), e = gd.end(); It != e; ++It)
+        {
+            if (clang::NamedDecl const * const Current = clang::dyn_cast<clang::NamedDecl>(*It))
+            {
+                if (! isBuiltin(Current))
+                {
+                    dump(Current);
+
+                    if (Current->hasBody())
+                    {
+                        findConstCast(Current->getBody());
+                    }
                 }
             }
         }
