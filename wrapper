@@ -1,0 +1,13 @@
+#!/bin/env bash
+set -o nounset
+set -o errexit
+
+script_dir=$(readlink -m $(dirname "${BASH_SOURCE[0]}"))
+build_dir=$(pwd)
+llvm_source_dir="$script_dir/../llvm.from.svn"
+llvm_build_dir="$llvm_source_dir/build"
+
+clang_exe=$llvm_build_dir/bin/clang++
+standard_includes=$($clang_exe -v -c -x c++ /dev/null 2>&1 | grep internal | awk '{ for (i = 1; i<=NF; i++) { if (match($i, "-internal-")) { k = ++i; printf("-I%s ", $k) } } }')
+
+$clang_exe -cc1 $standard_includes -load $build_dir/sources/libFindConstCandidates.so -plugin find-const-candidate $@
