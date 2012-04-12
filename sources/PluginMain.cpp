@@ -1,5 +1,6 @@
 // Copyright 2011 by Laszlo Nagy [see file LICENSE.TXT]
 
+#include "clang/Basic/Diagnostic.h"
 #include "clang/Basic/SourceLocation.h"
 #include "clang/Frontend/FrontendPluginRegistry.h"
 #include "clang/AST/ASTConsumer.h"
@@ -16,15 +17,25 @@ namespace
 {
 
 struct WriteDiagnostic {
+    clang::DiagnosticsEngine & DiagEng;
+
+    WriteDiagnostic(clang::DiagnosticsEngine & DE)
+        : DiagEng(DE)
+    { }
+
     void operator()(clang::Stmt const * const Current) const {
-        Current->dump();
+
+        unsigned const DiagID = DiagEng.getCustomDiagID(clang::DiagnosticsEngine::Warning, "explicit cast found");
+        DiagEng.Report(Current->getLocStart(), DiagID);
     }
 };
 
 class ASTConsumer : public clang::ASTConsumer
 {
+    clang::DiagnosticsEngine & DiagnosticsEngine;
 public:
-    ASTConsumer()
+    ASTConsumer(clang::DiagnosticsEngine & CurrentDiagnosticsEngine)
+        : DiagnosticsEngine(CurrentDiagnosticsEngine)
     { }
 
     static bool isBuiltin(clang::NamedDecl const * Decl) {
@@ -93,7 +104,7 @@ public:
                 }
             }
         }
-        WriteDiagnostic Reporter;
+        WriteDiagnostic Reporter(DiagnosticsEngine);
         std::for_each(Casts.begin(), Casts.end(), Reporter);
 
         return true;
@@ -103,8 +114,8 @@ public:
 class FindConstCandidateAction : public clang::PluginASTAction
 {
 protected:
-    clang::ASTConsumer * CreateASTConsumer(clang::CompilerInstance &, llvm::StringRef) {
-        return new ASTConsumer();
+    clang::ASTConsumer * CreateASTConsumer(clang::CompilerInstance & Compiler, llvm::StringRef) {
+        return new ASTConsumer(Compiler.getDiagnostics());
     }
 
     bool ParseArgs(clang::CompilerInstance const & Compiler,
