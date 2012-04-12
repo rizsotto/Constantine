@@ -10,9 +10,17 @@
 
 #include <queue>
 #include <iterator>
+#include <algorithm>
 
 namespace
 {
+
+struct WriteDiagnostic {
+    void operator()(clang::Stmt const * const Current) const
+    {
+        Current->dump();
+    }
+};
 
 class ASTConsumer : public clang::ASTConsumer
 {
@@ -26,11 +34,14 @@ public:
         return (id) && (id->isStr("__va_list_tag") || id->isStr("__builtin_va_list"));
     }
 
-    static void findConstCast(clang::Stmt const * Current) {
-        std::deque<const clang::Stmt *> WorkList;
-        std::back_insert_iterator<std::deque<const clang::Stmt *> > Inserter(WorkList);
+    typedef std::deque<const clang::Stmt *> StmtQueue;
+    typedef std::back_insert_iterator<StmtQueue> StmtQueueInserter;
 
-        *Inserter++ = Current;
+    static StmtQueueInserter & findConstCast(clang::Stmt const * const Current, StmtQueueInserter & Result) {
+        StmtQueue WorkList;
+        StmtQueueInserter WorkListInserter(WorkList);
+
+        *WorkListInserter++ = Current;
 
         while (! WorkList.empty()) {
             clang::Stmt const * const Head = WorkList.front();
@@ -39,7 +50,7 @@ public:
             switch (Head->getStmtClass()) {
             case clang::Stmt::BlockExprClass: {
                 clang::BlockExpr const * const B = clang::cast<clang::BlockExpr>(Head);
-                *Inserter++ = B->getBody();
+                *WorkListInserter++ = B->getBody();
                 break;
             }
             case clang::Stmt::CStyleCastExprClass:
@@ -48,14 +59,15 @@ public:
             case clang::Stmt::CXXDynamicCastExprClass:
             case clang::Stmt::CXXReinterpretCastExprClass:
             case clang::Stmt::CXXStaticCastExprClass: {
-                Head->dump();
+                *Result++ = Head;
                 break;
             }
             default:
-                std::copy(Head->child_begin(), Head->child_end(), Inserter);
+                std::copy(Head->child_begin(), Head->child_end(), WorkListInserter);
                 break;
             }
         }
+        return Result;
     }
 
     static void dump(clang::Decl const * const Current) {
@@ -65,21 +77,27 @@ public:
     }
 
     virtual bool HandleTopLevelDecl(clang::DeclGroupRef gd) {
+        StmtQueue Casts;
+        StmtQueueInserter CastInserter(Casts);
+
         for (clang::DeclGroupRef::iterator It = gd.begin(), e = gd.end(); It != e; ++It)
         {
             if (clang::NamedDecl const * const Current = clang::dyn_cast<clang::NamedDecl>(*It))
             {
                 if (! isBuiltin(Current))
                 {
-                    dump(Current);
+                    //dump(Current);
 
                     if (Current->hasBody())
                     {
-                        findConstCast(Current->getBody());
+                        CastInserter = findConstCast(Current->getBody(), CastInserter);
                     }
                 }
             }
         }
+        WriteDiagnostic Reporter;
+        std::for_each(Casts.begin(), Casts.end(), Reporter);
+
         return true;
     }
 };
