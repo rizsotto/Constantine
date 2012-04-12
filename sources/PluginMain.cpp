@@ -22,14 +22,14 @@ public:
     static bool is_builtin(clang::NamedDecl const * decl)
     {
         clang::IdentifierInfo const * const id = decl->getIdentifier();
-        return (id->isStr("__va_list_tag") || id->isStr("__builtin_va_list"));
+        return (id) && (id->isStr("__va_list_tag") || id->isStr("__builtin_va_list"));
     }
 
     void report_decl(clang::NamedDecl const * decl)
     {
         clang::SourceLocation const & loc = decl->getLocation();
         llvm::errs() << "top-level-decl: \"" << decl->getName() << "\" at ";
-        loc.print (llvm::errs(), m_sm);
+        loc.print(llvm::errs(), m_sm);
         llvm::errs() << "\n";
     }
 
