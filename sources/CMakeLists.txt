@@ -12,6 +12,7 @@ set(ourlib_symbols ExportedSymbolsList)
 add_library(${ourlib_target} SHARED ${ourlib_sources})
 
 include_directories(${CLANG_INCLUDE_DIRS})
+include_directories(${Boost_INCLUDE_DIRS})
 add_definitions(${CLANG_DEFINES})
 
 set_target_properties(${ourlib_target} PROPERTIES

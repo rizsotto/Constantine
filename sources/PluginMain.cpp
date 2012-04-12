@@ -7,16 +7,16 @@
 #include "clang/Frontend/CompilerInstance.h"
 #include "llvm/Support/raw_ostream.h"
 
+#include <algorithm>
+#include <boost/bind.hpp>
+
 namespace
 {
 
 class ASTConsumer : public clang::ASTConsumer
 {
-    clang::SourceManager const & m_sm;
-
 public:
-    ASTConsumer(clang::SourceManager const & sm)
-        : m_sm (sm)
+    ASTConsumer()
     { }
 
     static bool is_builtin(clang::NamedDecl const * decl)
@@ -25,12 +25,28 @@ public:
         return (id) && (id->isStr("__va_list_tag") || id->isStr("__builtin_va_list"));
     }
 
-    void report_decl(clang::NamedDecl const * decl)
+    static void print_attrs(clang::Decl const * decl)
     {
-        clang::SourceLocation const & loc = decl->getLocation();
-        llvm::errs() << "top-level-decl: \"" << decl->getName() << "\" at ";
-        loc.print(llvm::errs(), m_sm);
-        llvm::errs() << "\n";
+        llvm::raw_ostream & os = llvm::errs();
+        clang::ASTContext & ctx = decl->getASTContext();
+
+        std::for_each( decl->attr_begin(), decl->attr_end()
+                     , boost::bind(&clang::Attr::printPretty, _1, boost::ref(os), boost::ref(ctx)));
+    }
+
+    void report_decl(clang::NamedDecl const * decl) const
+    {
+        clang::StringRef const name = decl->getName();
+
+        llvm::raw_ostream & os = llvm::errs();
+
+        os << "top-level-decl: \"" << name << "\" ";
+        if (decl->hasAttrs())
+        {
+            os << "with attrs: ";
+            print_attrs(decl);
+        }
+        os << "\n";
     }
 
     virtual bool HandleTopLevelDecl(clang::DeclGroupRef gd)
@@ -54,7 +70,7 @@ class FindConstCandidateAction : public clang::PluginASTAction
 protected:
     clang::ASTConsumer * CreateASTConsumer(clang::CompilerInstance & compiler, llvm::StringRef)
     {
-        return new ASTConsumer(compiler.getSourceManager());
+        return new ASTConsumer();
     }
 
     bool ParseArgs(clang::CompilerInstance const & compiler,
