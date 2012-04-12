@@ -16,8 +16,7 @@ namespace
 {
 
 struct WriteDiagnostic {
-    void operator()(clang::Stmt const * const Current) const
-    {
+    void operator()(clang::Stmt const * const Current) const {
         Current->dump();
     }
 };
@@ -28,10 +27,9 @@ public:
     ASTConsumer()
     { }
 
-    static bool isBuiltin(clang::NamedDecl const * decl)
-    {
-        clang::IdentifierInfo const * const id = decl->getIdentifier();
-        return (id) && (id->isStr("__va_list_tag") || id->isStr("__builtin_va_list"));
+    static bool isBuiltin(clang::NamedDecl const * Decl) {
+        clang::IdentifierInfo const * const Id = Decl->getIdentifier();
+        return (Id) && (Id->isStr("__va_list_tag") || Id->isStr("__builtin_va_list"));
     }
 
     typedef std::deque<const clang::Stmt *> StmtQueue;
@@ -76,11 +74,11 @@ public:
         Current->print(llvm::errs(), DumpPolicy);
     }
 
-    virtual bool HandleTopLevelDecl(clang::DeclGroupRef gd) {
+    virtual bool HandleTopLevelDecl(clang::DeclGroupRef Decls) {
         StmtQueue Casts;
         StmtQueueInserter CastInserter(Casts);
 
-        for (clang::DeclGroupRef::iterator It = gd.begin(), e = gd.end(); It != e; ++It)
+        for (clang::DeclGroupRef::iterator It = Decls.begin(), e = Decls.end(); It != e; ++It)
         {
             if (clang::NamedDecl const * const Current = clang::dyn_cast<clang::NamedDecl>(*It))
             {
@@ -105,36 +103,30 @@ public:
 class FindConstCandidateAction : public clang::PluginASTAction
 {
 protected:
-    clang::ASTConsumer * CreateASTConsumer(clang::CompilerInstance & compiler, llvm::StringRef)
-    {
+    clang::ASTConsumer * CreateASTConsumer(clang::CompilerInstance &, llvm::StringRef) {
         return new ASTConsumer();
     }
 
-    bool ParseArgs(clang::CompilerInstance const & compiler,
-                   std::vector<std::string> const & args)
-    {
-        for (unsigned i = 0, e = args.size(); i != e; ++i)
-        {
-            llvm::errs() << "PrintFunctionNames arg = " << args[i] << "\n";
+    bool ParseArgs(clang::CompilerInstance const & Compiler,
+                   std::vector<std::string> const & Args) {
+        for (unsigned i = 0, e = Args.size(); i != e; ++i) {
+            llvm::errs() << "PrintFunctionNames arg = " << Args[i] << "\n";
             // Example error handling.
-            if (args[i] == "-an-error")
-            {
-                clang::DiagnosticsEngine & D = compiler.getDiagnostics();
+            if (Args[i] == "-an-error") {
+                clang::DiagnosticsEngine & D = Compiler.getDiagnostics();
                 unsigned DiagID = D.getCustomDiagID(
-                                      clang::DiagnosticsEngine::Error, "invalid argument '" + args[i] + "'");
+                                      clang::DiagnosticsEngine::Error, "invalid argument '" + Args[i] + "'");
                 D.Report(DiagID);
                 return false;
             }
         }
-        if (args.size() && args[0] == "help")
-        {
+        if (Args.size() && Args[0] == "help") {
             PrintHelp(llvm::errs() );
         }
         return true;
     }
-    void PrintHelp(llvm::raw_ostream & ros)
-    {
-        ros << "Help for PrintFunctionNames plugin goes here\n";
+    void PrintHelp(llvm::raw_ostream & Ros) {
+        Ros << "Help for PrintFunctionNames plugin goes here\n";
     }
 };
 
