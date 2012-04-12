@@ -34,19 +34,18 @@ public:
                      , boost::bind(&clang::Attr::printPretty, _1, boost::ref(os), boost::ref(ctx)));
     }
 
-    void report_decl(clang::NamedDecl const * decl) const
+    static void print_decl(clang::NamedDecl const * decl)
     {
-        clang::StringRef const name = decl->getName();
-
         llvm::raw_ostream & os = llvm::errs();
 
-        os << "top-level-decl: \"" << name << "\" ";
+        os << "top-level-decl: \"" << decl->getName() << "\"\n";
+        os << " with kind: " << decl->getDeclKindName() << "\n";
         if (decl->hasAttrs())
         {
-            os << "with attrs: ";
+            os << " with attrs: ";
             print_attrs(decl);
+            os << "\n";
         }
-        os << "\n";
     }
 
     virtual bool HandleTopLevelDecl(clang::DeclGroupRef gd)
@@ -57,7 +56,7 @@ public:
             {
                 if (! is_builtin(current))
                 {
-                    report_decl(current);
+                    print_decl(current);
                 }
             }
         }
