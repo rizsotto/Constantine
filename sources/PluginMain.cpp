@@ -25,29 +25,6 @@ public:
         return (id) && (id->isStr("__va_list_tag") || id->isStr("__builtin_va_list"));
     }
 
-    static void print_attrs(clang::Decl const * decl)
-    {
-        llvm::raw_ostream & os = llvm::errs();
-        clang::ASTContext & ctx = decl->getASTContext();
-
-        std::for_each( decl->attr_begin(), decl->attr_end()
-                     , boost::bind(&clang::Attr::printPretty, _1, boost::ref(os), boost::ref(ctx)));
-    }
-
-    static void print_decl(clang::NamedDecl const * decl)
-    {
-        llvm::raw_ostream & os = llvm::errs();
-
-        os << "top-level-decl: \"" << decl->getName() << "\"\n";
-        os << " with kind: " << decl->getDeclKindName() << "\n";
-        if (decl->hasAttrs())
-        {
-            os << " with attrs: ";
-            print_attrs(decl);
-            os << "\n";
-        }
-    }
-
     virtual bool HandleTopLevelDecl(clang::DeclGroupRef gd)
     {
         for (clang::DeclGroupRef::iterator it = gd.begin(), e = gd.end(); it != e; ++it)
@@ -56,7 +33,10 @@ public:
             {
                 if (! is_builtin(current))
                 {
-                    print_decl(current);
+                    clang::PrintingPolicy pp(current->getASTContext().getLangOpts());
+                    pp.Dump = true;
+
+                    current->print(llvm::errs(), pp);
                 }
             }
         }
