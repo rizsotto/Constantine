@@ -1,4 +1,4 @@
-// Copyright 2011 by Laszlo Nagy [see file LICENSE.TXT]
+// Copyright 2012 by Laszlo Nagy [see file MIT-LICENSE]
 
 #include "clang/Basic/Diagnostic.h"
 #include "clang/Basic/SourceLocation.h"

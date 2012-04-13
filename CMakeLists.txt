@@ -1,4 +1,4 @@
-# Copyright 2011 by Laszlo Nagy [see file LICENSE.TXT]
+# Copyright 2012 by Laszlo Nagy [see file MIT-LICENSE]
 
 cmake_minimum_required(VERSION 2.6)
 project(ConSug)

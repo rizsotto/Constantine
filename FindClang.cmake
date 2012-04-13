@@ -1,4 +1,4 @@
-# Copyright 2011 by Laszlo Nagy [see file LICENSE.TXT]
+# Copyright 2012 by Laszlo Nagy [see file MIT-LICENSE]
 
 # input:
 #   LLVM_SRC_DIR    - where are the llvm sources
