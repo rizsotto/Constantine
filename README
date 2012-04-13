@@ -1,1 +1,3 @@
-It's a const suggester plugin for CLang compiler.
+Toy project to write clang plugin.
+
+Currently implemented explicit cast lookup.
