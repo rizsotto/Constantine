@@ -17,6 +17,7 @@ set(clang_obj_dir "${llvm_obj_dir}/tools/clang")
 
 set(include_search_path ${include_search_path} "${clang_src_dir}/include")
 set(include_search_path ${include_search_path} "${clang_obj_dir}/include")
+set(clang_cflags ${clang_cflags} -fno-rtti)
 
 set(CLANG_FOUND 1)
 set(CLANG_INCLUDE_DIRS  ${include_search_path})
