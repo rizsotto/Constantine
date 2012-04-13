@@ -11,42 +11,26 @@
 
 #include <queue>
 #include <iterator>
-#include <algorithm>
 
-namespace
+namespace {
+
+bool isBuiltin(clang::NamedDecl const * Decl) {
+    clang::IdentifierInfo const * const Id = Decl->getIdentifier();
+    return (Id) && (Id->isStr("__va_list_tag") || Id->isStr("__builtin_va_list"));
+}
+
+class ExplicitCastFinder : public clang::ASTConsumer
 {
-
-struct WriteDiagnostic {
     clang::DiagnosticsEngine & DiagEng;
-
-    WriteDiagnostic(clang::DiagnosticsEngine & DE)
+public:
+    ExplicitCastFinder(clang::DiagnosticsEngine & DE)
         : DiagEng(DE)
     { }
 
-    void operator()(clang::Stmt const * const Current) const {
+    void findConstCast(clang::Stmt const * const Current) const {
+        typedef std::deque<const clang::Stmt *> StmtQueue;
+        typedef std::back_insert_iterator<StmtQueue> StmtQueueInserter;
 
-        unsigned const DiagID = DiagEng.getCustomDiagID(clang::DiagnosticsEngine::Warning, "explicit cast found");
-        DiagEng.Report(Current->getLocStart(), DiagID);
-    }
-};
-
-class ASTConsumer : public clang::ASTConsumer
-{
-    clang::DiagnosticsEngine & DiagnosticsEngine;
-public:
-    ASTConsumer(clang::DiagnosticsEngine & CurrentDiagnosticsEngine)
-        : DiagnosticsEngine(CurrentDiagnosticsEngine)
-    { }
-
-    static bool isBuiltin(clang::NamedDecl const * Decl) {
-        clang::IdentifierInfo const * const Id = Decl->getIdentifier();
-        return (Id) && (Id->isStr("__va_list_tag") || Id->isStr("__builtin_va_list"));
-    }
-
-    typedef std::deque<const clang::Stmt *> StmtQueue;
-    typedef std::back_insert_iterator<StmtQueue> StmtQueueInserter;
-
-    static StmtQueueInserter & findConstCast(clang::Stmt const * const Current, StmtQueueInserter & Result) {
         StmtQueue WorkList;
         StmtQueueInserter WorkListInserter(WorkList);
 
@@ -68,7 +52,10 @@ public:
             case clang::Stmt::CXXDynamicCastExprClass:
             case clang::Stmt::CXXReinterpretCastExprClass:
             case clang::Stmt::CXXStaticCastExprClass: {
-                *Result++ = Head;
+                unsigned const DiagID =
+                    DiagEng.getCustomDiagID(clang::DiagnosticsEngine::Warning,
+                                            "explicit cast found");
+                DiagEng.Report(Head->getLocStart(), DiagID);
                 break;
             }
             default:
@@ -76,72 +63,41 @@ public:
                 break;
             }
         }
-        return Result;
-    }
-
-    static void dump(clang::Decl const * const Current) {
-        clang::PrintingPolicy DumpPolicy(Current->getASTContext().getLangOpts());
-        DumpPolicy.Dump = true;
-        Current->print(llvm::errs(), DumpPolicy);
     }
 
     virtual bool HandleTopLevelDecl(clang::DeclGroupRef Decls) {
-        StmtQueue Casts;
-        StmtQueueInserter CastInserter(Casts);
-
-        for (clang::DeclGroupRef::iterator It = Decls.begin(), e = Decls.end(); It != e; ++It)
+        for (clang::DeclGroupRef::iterator It = Decls.begin(), End = Decls.end(); It != End; ++It)
         {
             if (clang::NamedDecl const * const Current = clang::dyn_cast<clang::NamedDecl>(*It))
             {
-                if (! isBuiltin(Current))
+                if ((! isBuiltin(Current)) && Current->hasBody())
                 {
-                    //dump(Current);
-
-                    if (Current->hasBody())
-                    {
-                        CastInserter = findConstCast(Current->getBody(), CastInserter);
-                    }
+                    findConstCast(Current->getBody());
                 }
             }
         }
-        WriteDiagnostic Reporter(DiagnosticsEngine);
-        std::for_each(Casts.begin(), Casts.end(), Reporter);
-
         return true;
     }
 };
 
-class FindConstCandidateAction : public clang::PluginASTAction
+class ExplicitCastPlugin : public clang::PluginASTAction
 {
 protected:
-    clang::ASTConsumer * CreateASTConsumer(clang::CompilerInstance & Compiler, llvm::StringRef) {
-        return new ASTConsumer(Compiler.getDiagnostics());
+    clang::ASTConsumer * CreateASTConsumer(clang::CompilerInstance & Compiler,
+                                           llvm::StringRef) {
+        return new ExplicitCastFinder(Compiler.getDiagnostics());
     }
 
-    bool ParseArgs(clang::CompilerInstance const & Compiler,
-                   std::vector<std::string> const & Args) {
-        for (unsigned i = 0, e = Args.size(); i != e; ++i) {
-            llvm::errs() << "PrintFunctionNames arg = " << Args[i] << "\n";
-            // Example error handling.
-            if (Args[i] == "-an-error") {
-                clang::DiagnosticsEngine & D = Compiler.getDiagnostics();
-                unsigned DiagID = D.getCustomDiagID(
-                                      clang::DiagnosticsEngine::Error, "invalid argument '" + Args[i] + "'");
-                D.Report(DiagID);
-                return false;
-            }
-        }
-        if (Args.size() && Args[0] == "help") {
-            PrintHelp(llvm::errs() );
-        }
+    bool ParseArgs(clang::CompilerInstance const &,
+                   std::vector<std::string> const &) {
         return true;
     }
     void PrintHelp(llvm::raw_ostream & Ros) {
-        Ros << "Help for PrintFunctionNames plugin goes here\n";
+        Ros << "List all explicit casts from given module\n";
     }
 };
 
 }
 
-static clang::FrontendPluginRegistry::Add<FindConstCandidateAction>
-    x("find-const-candidate", "suggests declaration to be const");
+static clang::FrontendPluginRegistry::Add<ExplicitCastPlugin>
+    X("find-explicit-casts", "look for explicit casts");

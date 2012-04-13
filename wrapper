@@ -7,4 +7,4 @@ build_dir=$(pwd)
 clang_exe=clang++
 standard_includes=$($clang_exe -v -c -x c++ /dev/null -o /dev/null 2>&1 | grep internal | awk '{ for (i = 1; i<=NF; i++) { if (match($i, "-internal-")) { k = ++i; printf("-I%s ", $k) } } }')
 
-$clang_exe $standard_includes -Xclang -load -Xclang $build_dir/sources/libFindConstCandidates.so -Xclang -plugin -Xclang find-const-candidate $@
+$clang_exe $standard_includes -Xclang -load -Xclang $build_dir/sources/libFindConstCandidates.so -Xclang -plugin -Xclang find-explicit-casts $@
