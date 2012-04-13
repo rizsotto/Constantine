@@ -11,4 +11,4 @@ cmake $script_dir -DLLVM_SRC_DIR=$llvm_source_dir -DLLVM_BUILD_DIR=$llvm_build_d
 
 make
 
-$script_dir/wrapper $script_dir/test/first.cpp
+$script_dir/wrapper -c $script_dir/test/first.cpp
