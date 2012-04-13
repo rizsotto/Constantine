@@ -1,6 +1,6 @@
 # Copyright 2012 by Laszlo Nagy [see file MIT-LICENSE]
 
-set(ourlib_target FindConstCandidates)
+set(ourlib_target Medve)
 
 set(ourlib_sources
     PluginMain.cpp

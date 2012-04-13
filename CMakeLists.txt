@@ -6,7 +6,6 @@ project(ConSug)
 set(CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR})
 
 find_package(Threads REQUIRED)
-find_package(Boost REQUIRED)
 find_package(Clang REQUIRED)
 
 add_subdirectory(sources)
