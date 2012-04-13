@@ -8,21 +8,15 @@
 #   CLANG_INCLUDE_DIRS
 #   CLANG_DEFINES
 
-set(CLANG_SRC_DIR "${LLVM_SRC_DIR}/tools/clang")
-set(CLANG_BUILD_DIR "${LLVM_BUILD_DIR}/tools/clang")
+execute_process(COMMAND llvm-config --src-root OUTPUT_VARIABLE llvm_src_dir OUTPUT_STRIP_TRAILING_WHITESPACE)
+execute_process(COMMAND llvm-config --obj-root OUTPUT_VARIABLE llvm_obj_dir OUTPUT_STRIP_TRAILING_WHITESPACE)
+execute_process(COMMAND llvm-config --cppflags OUTPUT_VARIABLE clang_cflags OUTPUT_STRIP_TRAILING_WHITESPACE)
 
-set(include_search_path ${include_search_path} "${LLVM_SRC_DIR}/include")
-set(include_search_path ${include_search_path} "${CLANG_SRC_DIR}/include")
-set(include_search_path ${include_search_path} "${LLVM_BUILD_DIR}/include")
-set(include_search_path ${include_search_path} "${CLANG_BUILD_DIR}/include")
+set(clang_src_dir "${llvm_src_dir}/tools/clang")
+set(clang_obj_dir "${llvm_obj_dir}/tools/clang")
 
-set(clang_cflags ${clang_cflags} -D_GNU_SOURCE)
-set(clang_cflags ${clang_cflags} -D__STDC_LIMIT_MACROS)
-set(clang_cflags ${clang_cflags} -D__STDC_CONSTANT_MACROS)
-set(clang_cflags ${clang_cflags} -DHAVE_CLANG_CONFIG_H)
-set(clang_cflags ${clang_cflags} -fno-rtti)
-
-set(lib_search_dir "${LLVM_BUILD_DIR}/lib")
+set(include_search_path ${include_search_path} "${clang_src_dir}/include")
+set(include_search_path ${include_search_path} "${clang_obj_dir}/include")
 
 set(CLANG_FOUND 1)
 set(CLANG_INCLUDE_DIRS  ${include_search_path})
