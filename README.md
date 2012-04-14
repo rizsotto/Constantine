@@ -23,6 +23,7 @@ How to build
 * Make sure that `llvm-config` is in your `PATH`
 * `mkdir build && cd build`
 * `cmake .. && make`
+* To run it on an example file type: `../wrapper -c ../test/first.cpp`
 
-[1]: http://clang.llvm.org/get_started.html      Clang getting started
+[1]: http://clang.llvm.org/get_started.html     "clang getting started"
 
