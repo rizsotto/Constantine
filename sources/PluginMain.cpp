@@ -21,7 +21,7 @@ public:
         : DiagEng(DE)
     { }
 
-    virtual bool HandleTopLevelDecl(clang::DeclGroupRef Decls) {
+    bool HandleTopLevelDecl(clang::DeclGroupRef Decls) {
         for (clang::DeclGroupRef::iterator It = Decls.begin(), End = Decls.end(); It != End; ++It)
         {
             if (clang::NamedDecl * Current = clang::dyn_cast<clang::NamedDecl>(*It))
@@ -53,9 +53,6 @@ protected:
     bool ParseArgs(clang::CompilerInstance const &,
                    std::vector<std::string> const &) {
         return true;
-    }
-    void PrintHelp(llvm::raw_ostream & Ros) {
-        Ros << "List all explicit casts from given module\n";
     }
 };
 
