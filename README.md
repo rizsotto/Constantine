@@ -20,7 +20,7 @@ r154753 is known to be working. (Sat, 14 Apr 2012)
 How to build
 ------------
 
-* Make sure that `llvm-config` is in your `PATH`
+* Make sure that `llvm-config` and `clang++` binaries are in your `PATH`
 * `mkdir build && cd build`
 * `cmake .. && make`
 * To run it on an example file type: `../wrapper -c ../test/first.cpp`

@@ -1,8 +1,5 @@
 # Copyright 2012 by Laszlo Nagy [see file MIT-LICENSE]
 
-# input:
-#   LLVM_SRC_DIR    - where are the llvm sources
-#   LLVM_BUILD_DIR  - where are the llvm libs
 # output:
 #   CLANG_FOUND
 #   CLANG_INCLUDE_DIRS
