@@ -9,3 +9,4 @@ find_package(Threads REQUIRED)
 find_package(Clang REQUIRED)
 
 add_subdirectory(sources)
+add_subdirectory(test)

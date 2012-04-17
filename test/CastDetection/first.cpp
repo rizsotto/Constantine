@@ -1,3 +1,4 @@
+// RUN: %clang_cc1 %s
 #include <stdio.h>
 
 int good_candidate( int );
