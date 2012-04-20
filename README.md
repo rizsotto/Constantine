@@ -15,15 +15,15 @@ You need a copy of the upcoming clang 3.1 compiler. Since it is not released
 yet, you need to check out from SVN. Description for that you can find from
 [clang getting started][1].
 
-r154753 is known to be working. (Sat, 14 Apr 2012)
+r155236 is known to be working. (Fri, 20 Apr 2012)
 
 How to build
 ------------
 
-* Make sure that `llvm-config` and `clang++` binaries are in your `PATH`
+* Make sure that `llvm-config` and `clang` binaries are in your `PATH`
 * `mkdir build && cd build`
 * `cmake .. && make`
-* To run it on an example file type: `../wrapper -c ../test/first.cpp`
+* To run test suite `make check`
 
 [1]: http://clang.llvm.org/get_started.html     "clang getting started"
 
