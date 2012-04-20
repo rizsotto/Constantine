@@ -1,9 +1,0 @@
-#!/bin/env bash
-set -o nounset
-set -o errexit
-
-build_dir=$(pwd)
-
-clang_exe=clang++
-
-$clang_exe -Xclang -load -Xclang $build_dir/sources/libMedve.so -Xclang -plugin -Xclang find-explicit-casts $@
