@@ -21,3 +21,6 @@ set_target_properties(${ourlib_target} PROPERTIES
     PREFIX "lib")
 set_target_properties(${ourlib_target} PROPERTIES
     LINK_FlAGS "-exported_symbols_list ${ourlib_symbols}")
+
+install(TARGETS ${ourlib_target}
+    LIBRARY DESTINATION lib)
