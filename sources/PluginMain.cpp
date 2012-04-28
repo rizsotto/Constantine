@@ -1,5 +1,6 @@
 // Copyright 2012 by Laszlo Nagy [see file MIT-LICENSE]
 
+#include <clang/Basic/LangOptions.h>
 #include <clang/Basic/Diagnostic.h>
 #include <clang/Basic/SourceLocation.h>
 #include <clang/Frontend/FrontendPluginRegistry.h>
@@ -41,10 +42,24 @@ private:
     clang::DiagnosticsEngine & Diagnostics;
 };
 
+class NullConsumer : public clang::ASTConsumer {
+public:
+    NullConsumer()
+        : clang::ASTConsumer()
+    { }
+};
+
 class MedvePlugin : public clang::PluginASTAction {
+    static bool isCPlusPlus(clang::CompilerInstance const & Compiler) {
+        clang::LangOptions const Opts = Compiler.getLangOpts();
+
+        return (Opts.CPlusPlus) || (Opts.CPlusPlus0x);
+    }
     clang::ASTConsumer * CreateASTConsumer(clang::CompilerInstance & Compiler,
                                            llvm::StringRef) {
-        return new ExplicitCastFinder(Compiler.getDiagnostics());
+        return isCPlusPlus(Compiler)
+            ? (clang::ASTConsumer *) new ExplicitCastFinder(Compiler.getDiagnostics())
+            : (clang::ASTConsumer *) new NullConsumer();
     }
 
     bool ParseArgs(clang::CompilerInstance const &,
