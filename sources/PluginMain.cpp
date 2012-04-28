@@ -13,19 +13,17 @@
 namespace {
 
 class ExplicitCastFinder : public clang::ASTConsumer
-                         , public clang::RecursiveASTVisitor<ExplicitCastFinder>
-{
-    clang::DiagnosticsEngine & DiagEng;
+                         , public clang::RecursiveASTVisitor<ExplicitCastFinder> {
 public:
     ExplicitCastFinder(clang::DiagnosticsEngine & DE)
-        : DiagEng(DE)
+        : clang::ASTConsumer()
+        , clang::RecursiveASTVisitor<ExplicitCastFinder>()
+        , Diagnostics(DE)
     { }
 
     bool HandleTopLevelDecl(clang::DeclGroupRef Decls) {
-        for (clang::DeclGroupRef::iterator It = Decls.begin(), End = Decls.end(); It != End; ++It)
-        {
-            if (clang::NamedDecl * Current = clang::dyn_cast<clang::NamedDecl>(*It))
-            {
+        for (clang::DeclGroupRef::iterator It = Decls.begin(), End = Decls.end(); It != End; ++It) {
+            if (clang::NamedDecl * Current = clang::dyn_cast<clang::NamedDecl>(*It)) {
                 TraverseDecl(Current);
             }
         }
@@ -33,18 +31,17 @@ public:
     }
 
     bool VisitExplicitCastExpr(clang::ExplicitCastExpr * Decl) {
-        unsigned const DiagID =
-            DiagEng.getCustomDiagID(clang::DiagnosticsEngine::Warning,
+        unsigned const Id =
+            Diagnostics.getCustomDiagID(clang::DiagnosticsEngine::Warning,
                                     "explicit cast found");
-        DiagEng.Report(Decl->getLocStart(), DiagID);
+        Diagnostics.Report(Decl->getLocStart(), Id);
         return true;
     }
-
+private:
+    clang::DiagnosticsEngine & Diagnostics;
 };
 
-class ExplicitCastPlugin : public clang::PluginASTAction
-{
-protected:
+class MedvePlugin : public clang::PluginASTAction {
     clang::ASTConsumer * CreateASTConsumer(clang::CompilerInstance & Compiler,
                                            llvm::StringRef) {
         return new ExplicitCastFinder(Compiler.getDiagnostics());
@@ -56,7 +53,7 @@ protected:
     }
 };
 
-}
+} // namespace anonymous
 
 static clang::FrontendPluginRegistry::Add<MedvePlugin>
     MedvePluginRegistry("medve", "suggest const usage");
