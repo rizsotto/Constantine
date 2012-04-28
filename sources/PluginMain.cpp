@@ -58,5 +58,5 @@ protected:
 
 }
 
-static clang::FrontendPluginRegistry::Add<ExplicitCastPlugin>
-    X("find-explicit-casts", "look for explicit casts");
+static clang::FrontendPluginRegistry::Add<MedvePlugin>
+    MedvePluginRegistry("medve", "suggest const usage");
