@@ -13,33 +13,42 @@
 
 namespace {
 
-class ExplicitCastFinder : public clang::ASTConsumer
-                         , public clang::RecursiveASTVisitor<ExplicitCastFinder> {
+void verboseDump(clang::Decl const * const Decl) {
+    clang::LangOptions const LO;
+    clang::PrintingPolicy PP(LO);
+    PP.Dump = true;
+
+    Decl->print(llvm::errs(), PP);
+}
+
+class VariableVisitor : public clang::ASTConsumer
+                      , public clang::RecursiveASTVisitor<VariableVisitor> {
 public:
-    ExplicitCastFinder(clang::DiagnosticsEngine & DE)
+    VariableVisitor()
         : clang::ASTConsumer()
-        , clang::RecursiveASTVisitor<ExplicitCastFinder>()
-        , Diagnostics(DE)
+        , clang::RecursiveASTVisitor<VariableVisitor>()
     { }
 
-    bool HandleTopLevelDecl(clang::DeclGroupRef Decls) {
-        for (clang::DeclGroupRef::iterator It = Decls.begin(), End = Decls.end(); It != End; ++It) {
-            if (clang::NamedDecl * Current = clang::dyn_cast<clang::NamedDecl>(*It)) {
-                TraverseDecl(Current);
-            }
-        }
-        return true;
+    virtual void HandleTranslationUnit(clang::ASTContext & ctx) {
+        TraverseDecl(ctx.getTranslationUnitDecl());
     }
 
-    bool VisitExplicitCastExpr(clang::ExplicitCastExpr * Decl) {
-        unsigned const Id =
-            Diagnostics.getCustomDiagID(clang::DiagnosticsEngine::Warning,
-                                    "explicit cast found");
-        Diagnostics.Report(Decl->getLocStart(), Id);
+    // method arguments
+    bool VisitParmVarDecl(clang::ParmVarDecl const * const Decl) {
+        return VisitFilteredVarDecl(Decl);
+    }
+
+    // top level variable declarations
+    bool VisitVarDecl(clang::VarDecl const * const Decl) {
+        return (Decl->isFileVarDecl() && (!Decl->hasExternalStorage()))
+            ? VisitFilteredVarDecl(Decl)
+            : true;
+    }
+
+    bool VisitFilteredVarDecl(clang::VarDecl const * const Decl) {
+        verboseDump(Decl);
         return true;
     }
-private:
-    clang::DiagnosticsEngine & Diagnostics;
 };
 
 class NullConsumer : public clang::ASTConsumer {
@@ -58,7 +67,7 @@ class MedvePlugin : public clang::PluginASTAction {
     clang::ASTConsumer * CreateASTConsumer(clang::CompilerInstance & Compiler,
                                            llvm::StringRef) {
         return isCPlusPlus(Compiler)
-            ? (clang::ASTConsumer *) new ExplicitCastFinder(Compiler.getDiagnostics())
+            ? (clang::ASTConsumer *) new VariableVisitor()
             : (clang::ASTConsumer *) new NullConsumer();
     }
 
