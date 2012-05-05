@@ -132,8 +132,9 @@ public:
 
     // method arguments
     bool VisitParmVarDecl(clang::ParmVarDecl const * const Decl) {
-        if (Decl->getType().isConstQualified())
+        if (Decl->getType().isConstQualified()) {
             return true;
+        }
 
         clang::DeclContext const * const Ctx = Decl->getParentFunctionOrMethod();
         assert(Ctx);
@@ -145,21 +146,20 @@ public:
 
         //Function->getBody()->dump();
         ConstantAnalysis Checker(Function->getBody());
-        return (Checker.isPseudoConstant(Decl))
-            ? reportPseudoConst(Decl)
-            : true;
+        if (Checker.isPseudoConstant(Decl)) {
+            reportPseudoConst(Decl);
+        }
+        return true;
     }
 
 private:
-    bool report(clang::VarDecl const * const Decl, char const * const msg) {
+    void report(clang::VarDecl const * const Decl, char const * const msg) {
         unsigned const DiagID =
             DiagEng.getCustomDiagID(clang::DiagnosticsEngine::Warning, msg);
         DiagEng.Report(Decl->getLocStart(), DiagID);
-
-        return true;
     }
-    bool reportPseudoConst(clang::VarDecl const * const Decl) {
-        return report(Decl, "variable could be declared as const [Medve plugin]");
+    void reportPseudoConst(clang::VarDecl const * const Decl) {
+        report(Decl, "variable could be declared as const [Medve plugin]");
     }
 };
 
