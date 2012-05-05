@@ -1,16 +1,12 @@
 // Copyright 2012 by Laszlo Nagy [see file MIT-LICENSE]
 
-#include <cassert>
 #include <clang/Basic/LangOptions.h>
 #include <clang/Basic/Diagnostic.h>
-#include <clang/Basic/SourceLocation.h>
 #include <clang/Frontend/FrontendPluginRegistry.h>
 #include <clang/Frontend/CompilerInstance.h>
 #include <clang/AST/ASTConsumer.h>
 #include <clang/AST/RecursiveASTVisitor.h>
 #include <clang/AST/AST.h>
-#include <clang/AST/Stmt.h>
-#include <llvm/Support/raw_ostream.h>
 #include <llvm/ADT/SmallSet.h>
 
 namespace {
@@ -126,28 +122,19 @@ public:
         , DiagEng(Compiler.getDiagnostics())
     { }
 
-    virtual void HandleTranslationUnit(clang::ASTContext & ctx) {
-        TraverseDecl(ctx.getTranslationUnitDecl());
+    virtual void HandleTranslationUnit(clang::ASTContext & Ctx) {
+        TraverseDecl(Ctx.getTranslationUnitDecl());
     }
 
-    // method arguments
-    bool VisitParmVarDecl(clang::ParmVarDecl const * const Decl) {
-        if (Decl->getType().isConstQualified()) {
-            return true;
-        }
-
-        clang::DeclContext const * const Ctx = Decl->getParentFunctionOrMethod();
-        assert(Ctx);
-
-        clang::FunctionDecl const * const Function =
-            llvm::dyn_cast<clang::FunctionDecl const>(Ctx);
-        assert(Function);
-        assert(Function->hasBody());
-
-        //Function->getBody()->dump();
-        ConstantAnalysis Checker(Function->getBody());
-        if (Checker.isPseudoConstant(Decl)) {
-            reportPseudoConst(Decl);
+    bool VisitFunctionDecl(clang::FunctionDecl const * const F) {
+        if (F->hasBody() && F->param_size()) {
+            ConstantAnalysis Checker(F->getBody());
+            for (clang::FunctionDecl::param_const_iterator It = F->param_begin(),
+                End = F->param_end(); It != End; ++It) {
+                if ((! (*It)->getType().isConstQualified()) && (Checker.isPseudoConstant(*It))) {
+                    reportPseudoConst(*It);
+                }
+            }
         }
         return true;
     }
