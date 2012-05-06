@@ -1,5 +1,11 @@
 // Copyright 2012 by Laszlo Nagy [see file MIT-LICENSE]
 
+#include <set>
+#include <map>
+#include <algorithm>
+#include <functional>
+#include <iterator>
+#include <cassert>
 #include <clang/Basic/LangOptions.h>
 #include <clang/Basic/Diagnostic.h>
 #include <clang/Frontend/FrontendPluginRegistry.h>
@@ -7,27 +13,20 @@
 #include <clang/AST/ASTConsumer.h>
 #include <clang/AST/RecursiveASTVisitor.h>
 #include <clang/AST/AST.h>
-#include <llvm/ADT/SmallSet.h>
 
 namespace {
 
-class ConstantAnalysis : public clang::RecursiveASTVisitor<ConstantAnalysis> {
-    static size_t const VARDECL_SET_SIZE = 256;
-    typedef llvm::SmallPtrSet<clang::VarDecl const*, VARDECL_SET_SIZE> VarDeclSet;
-    VarDeclSet NonConstants;
-public:
-    ConstantAnalysis(clang::Stmt * const Stmt)
-        : NonConstants()
-    {
-        TraverseStmt(Stmt);
-    }
+typedef std::set<clang::Stmt const *> Contexts;
+typedef std::set<clang::VarDecl const *> Variables;
+typedef std::map<clang::Stmt const *, Variables> VariablesByContext;
+typedef std::map<clang::VarDecl const *, Contexts> ContextsByVariable;
 
-    static clang::Decl const * getDecl(clang::Expr const * E) {
-        if (clang::DeclRefExpr const * DR = clang::dyn_cast<clang::DeclRefExpr const>(E))
-            return DR->getDecl();
-        else
-            return 0;
-    }
+class ConstantAnalysis : public clang::RecursiveASTVisitor<ConstantAnalysis> {
+    Variables NonConstants;
+public:
+    ConstantAnalysis()
+        : NonConstants()
+    { }
 
     bool VisitBinaryOperator(clang::BinaryOperator const * const BO) {
         clang::Decl const * const LHSDecl =
@@ -88,6 +87,19 @@ public:
         return true;
     }
 
+    bool VisitDeclStmt(clang::DeclStmt const * const DS) {
+        for (clang::DeclStmt::const_decl_iterator I = DS->decl_begin(),
+             E = DS->decl_end(); I != E; ++I) {
+            checkRefDeclaration(*I);
+        }
+        return true;
+    }
+
+    Variables const & getNonConstVariables() const {
+        return NonConstants;
+    }
+
+private:
     void checkRefDeclaration(clang::Decl const * const Decl) {
         clang::VarDecl const * const VD = clang::dyn_cast<clang::VarDecl const>(Decl);
         if ((VD) && (VD->getType().getTypePtr()->isReferenceType())) {
@@ -99,54 +111,151 @@ public:
         }
     }
 
-    bool VisitDeclStmt(clang::DeclStmt const * const DS) {
-        for (clang::DeclStmt::const_decl_iterator I = DS->decl_begin(),
-             E = DS->decl_end(); I != E; ++I) {
-            checkRefDeclaration(*I);
+    static clang::Decl const * getDecl(clang::Expr const * E) {
+        if (clang::DeclRefExpr const * DR = clang::dyn_cast<clang::DeclRefExpr const>(E)) {
+            return DR->getDecl();
         }
-        return true;
+        return 0;
     }
 
-    bool isPseudoConstant(const clang::VarDecl *VD) const {
-        return ! NonConstants.count(VD);
-    }
+    ConstantAnalysis(ConstantAnalysis const &);
+    ConstantAnalysis & operator=(ConstantAnalysis const &);
 };
 
-class VariableVisitor : public clang::ASTConsumer
-                      , public clang::RecursiveASTVisitor<VariableVisitor> {
-    clang::DiagnosticsEngine & DiagEng;
+class DeclContextVisitor : public clang::RecursiveASTVisitor<DeclContextVisitor> {
+    VariablesByContext Vars;
+    ContextsByVariable Ctxs;
+
 public:
-    VariableVisitor(clang::CompilerInstance const & Compiler)
-        : clang::ASTConsumer()
-        , clang::RecursiveASTVisitor<VariableVisitor>()
-        , DiagEng(Compiler.getDiagnostics())
+    DeclContextVisitor()
+        : clang::RecursiveASTVisitor<DeclContextVisitor>()
+        , Vars()
+        , Ctxs()
     { }
 
-    virtual void HandleTranslationUnit(clang::ASTContext & Ctx) {
-        TraverseDecl(Ctx.getTranslationUnitDecl());
+    bool VisitBlockDeck(clang::BlockDecl const * const D) {
+        return collectDeclarations(D, D);
+    }
+    bool VisitFunctionDecl(clang::FunctionDecl const * const D) {
+        return collectDeclarations(D, D);
+    }
+    bool VisitLinkageSpecDecl(clang::LinkageSpecDecl const * const D) {
+        return collectDeclarations(D, D);
+    }
+    bool VisitNamespaceDecl(clang::NamespaceDecl const * const D) {
+        return collectDeclarations(D, D);
+    }
+    bool VisitTagDecl(clang::TagDecl const * const D) {
+        return collectDeclarations(D, D);
+    }
+    bool VisitTranslationUnitDecl(clang::TranslationUnitDecl const * const D) {
+        return collectDeclarations(D, D);
     }
 
-    bool VisitFunctionDecl(clang::FunctionDecl const * const F) {
-        if (F->hasBody() && F->param_size()) {
-            ConstantAnalysis Checker(F->getBody());
-            for (clang::FunctionDecl::param_const_iterator It = F->param_begin(),
-                End = F->param_end(); It != End; ++It) {
-                if ((! (*It)->getType().isConstQualified()) && (Checker.isPseudoConstant(*It))) {
-                    reportPseudoConst(*It);
+    VariablesByContext const & getVariablesByContext() const {
+        return Vars;
+    }
+    ContextsByVariable const & getContextsByVariable() const {
+        return Ctxs;
+    }
+
+private:
+    void insertContextsByVariable(clang::Stmt const * const S, clang::VarDecl const * const D) {
+        if (! D->getType().isConstQualified()) {
+            ContextsByVariable::iterator It = Ctxs.find(D);
+            if (Ctxs.end() == It) {
+                std::pair<ContextsByVariable::iterator, bool> Result = Ctxs.insert(ContextsByVariable::value_type(D, Contexts()));
+                assert(Result.second);
+                It = Result.first;
+                assert(Ctxs.end() != It);
+            }
+            (*It).second.insert(S);
+        }
+    }
+    void insertVariablesByContext(clang::VarDecl const * const D, clang::Stmt const * const S) {
+        if (! D->getType().isConstQualified()) {
+            VariablesByContext::iterator It = Vars.find(S);
+            if (Vars.end() == It) {
+                std::pair<VariablesByContext::iterator, bool> Result = Vars.insert(VariablesByContext::value_type(S, Variables()));
+                assert(Result.second);
+                It = Result.first;
+                assert(Vars.end() != It);
+            }
+            (*It).second.insert(D);
+        }
+    }
+    bool collectDeclarations(clang::DeclContext const * const DC, clang::Decl const * const D) {
+        if (D->hasBody() && !DC->decls_empty()) {
+            clang::Stmt const * const S = D->getBody();
+            for (clang::DeclContext::decl_iterator It(DC->decls_begin()), End(DC->decls_end());
+                End != It; ++It) {
+                if (clang::VarDecl const * const VD = clang::dyn_cast<clang::VarDecl const>(*It)) {
+                    insertContextsByVariable(S, VD);
+                    insertVariablesByContext(VD, S);
                 }
             }
         }
         return true;
     }
 
-private:
-    void report(clang::VarDecl const * const Decl, char const * const msg) {
-        unsigned const DiagID =
-            DiagEng.getCustomDiagID(clang::DiagnosticsEngine::Warning, msg);
-        DiagEng.Report(Decl->getLocStart(), DiagID);
+    DeclContextVisitor(DeclContextVisitor const &);
+    DeclContextVisitor & operator=(DeclContextVisitor const &);
+};
+
+class VariableChecker : public clang::ASTConsumer {
+    clang::DiagnosticsEngine & DiagEng;
+public:
+    VariableChecker(clang::CompilerInstance const & Compiler)
+        : clang::ASTConsumer()
+        , DiagEng(Compiler.getDiagnostics())
+    { }
+
+    void HandleTranslationUnit(clang::ASTContext & Ctx) {
+        DeclContextVisitor Collector;
+        Collector.TraverseDecl(Ctx.getTranslationUnitDecl());
+
+        VariablesByContext const & Input = Collector.getVariablesByContext();
+        VariablesByContext Output;
+        std::insert_iterator<VariablesByContext> OutputIt(Output, Output.begin());
+        std::transform(Input.begin(), Input.end(), OutputIt, &VariableChecker::analyse);
+        ContextsByVariable const & Candidates = Collector.getContextsByVariable();
+        ContextsByVariable Result;
+        std::insert_iterator<ContextsByVariable> ResultIt(Result, Result.begin());
+        std::remove_copy_if(Candidates.begin(), Candidates.end(), ResultIt, std::bind1st(std::ptr_fun(VariableChecker::check), Output));
+        std::for_each(Result.begin(), Result.end(), std::bind1st(std::ptr_fun(VariableChecker::report), DiagEng));
     }
-    void reportPseudoConst(clang::VarDecl const * const Decl) {
-        report(Decl, "variable could be declared as const [Medve plugin]");
+
+private:
+    static VariablesByContext::value_type analyse(VariablesByContext::value_type const In) {
+        VariablesByContext::value_type Result(In);
+        {
+            ConstantAnalysis Analysis;
+            Analysis.TraverseStmt(const_cast<clang::Stmt*>(In.first));
+            Result.second = Analysis.getNonConstVariables();
+        }
+        return Result;
+    }
+
+    static bool check(VariablesByContext const & AllCtxs, ContextsByVariable::value_type It) {
+        clang::VarDecl const * Var = It.first;
+        Contexts const & Visibles = It.second;
+        for (Contexts::const_iterator It(Visibles.begin()), End(Visibles.end());
+            End != It; ++It) {
+            VariablesByContext::const_iterator CtxIt = AllCtxs.find(*It);
+            assert(AllCtxs.end() != CtxIt);
+            if (CtxIt->second.count(Var)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    static void report(clang::DiagnosticsEngine & DiagEng, ContextsByVariable::value_type It) {
+        char const * const Msg = "variable could be declared as const [Medve plugin]";
+        unsigned const DiagID =
+            DiagEng.getCustomDiagID(clang::DiagnosticsEngine::Warning, Msg);
+        clang::VarDecl const * const Decl = It.first;
+        DiagEng.Report(Decl->getLocStart(), DiagID);
     }
 };
 
@@ -166,7 +275,7 @@ class MedvePlugin : public clang::PluginASTAction {
     clang::ASTConsumer * CreateASTConsumer(clang::CompilerInstance & Compiler,
                                            llvm::StringRef) {
         return isCPlusPlus(Compiler)
-            ? (clang::ASTConsumer *) new VariableVisitor(Compiler)
+            ? (clang::ASTConsumer *) new VariableChecker(Compiler)
             : (clang::ASTConsumer *) new NullConsumer();
     }
 

@@ -13,7 +13,7 @@ int post_dec(int k)
 { k--; return 0; }
 
 int address_of(int k)
-{ int * j = &k; return 0; }
+{ int * const j = &k; return 0; }
 
 int assign(int k)
 { k = 9; return k; }
@@ -46,7 +46,4 @@ int call_inc_with_const(int const k)
 { return inc(k); }
 
 int ref_declared(int k)
-{ int & j = k; return 0; }
-
-int const_ref_declared(int k) // would be nice to generate warning
-{ int const & j = k; return 0; }
+{ int & j = k; ++j; return 0; }
