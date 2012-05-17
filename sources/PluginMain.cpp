@@ -185,13 +185,15 @@ private:
         }
     }
     bool collectDeclarations(clang::DeclContext const * const DC, clang::Decl const * const D) {
-        if (D->hasBody() && !DC->decls_empty()) {
-            clang::Stmt const * const S = D->getBody();
-            for (clang::DeclContext::decl_iterator It(DC->decls_begin()), End(DC->decls_end());
-                End != It; ++It) {
-                if (clang::VarDecl const * const VD = clang::dyn_cast<clang::VarDecl const>(*It)) {
-                    insertContextsByVariable(S, VD);
-                    insertVariablesByContext(VD, S);
+        for (clang::DeclContext const * Cit(DC); 0 != Cit; Cit = Cit->getParent()) {
+            for (clang::DeclContext::decl_iterator Dit(Cit->decls_begin()), End(Cit->decls_end());
+                End != Dit; ++Dit) {
+                if (clang::VarDecl const * const VD = clang::dyn_cast<clang::VarDecl const>(*Dit)) {
+                    if (D->hasBody()) {
+                        clang::Stmt const * const S = D->getBody();
+                        insertContextsByVariable(S, VD);
+                        insertVariablesByContext(VD, S);
+                    }
                 }
             }
         }
