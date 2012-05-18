@@ -6,7 +6,7 @@ Medve is a toy project to learn how to write clang plugin.
 Implemented functionalities
 ---------------------------
 
-* Currently implemented explicit cast lookup.
+* Currently implemented const analysis for basic types.
 
 Prerequisites
 -------------
@@ -15,7 +15,7 @@ You need a copy of the upcoming clang 3.1 compiler. Since it is not released
 yet, you need to check out from SVN. Description for that you can find from
 [clang getting started][1].
 
-r155236 is known to be working. (Fri, 20 Apr 2012)
+r156985 is known to be working. (Fri, 19 May 2012)
 
 How to build
 ------------
