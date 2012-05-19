@@ -239,13 +239,9 @@ public:
 
 private:
     static VariablesByContext::value_type analyse(VariablesByContext::value_type const In) {
-        VariablesByContext::value_type Result(In);
-        {
-            ConstantAnalysis Analysis;
-            Analysis.TraverseStmt(const_cast<clang::Stmt*>(In.first));
-            Result.second = Analysis.getNonConstVariables();
-        }
-        return Result;
+        ConstantAnalysis Analysis;
+        Analysis.TraverseStmt(const_cast<clang::Stmt*>(In.first));
+        return VariablesByContext::value_type(In.first, Analysis.getNonConstVariables());
     }
 
     static bool check(VariablesByContext const & AllCtxs, ContextsByVariable::value_type It) {
