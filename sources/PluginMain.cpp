@@ -160,8 +160,11 @@ public:
     }
 
 private:
+    static bool is_non_const(clang::VarDecl const * const D) {
+        return (! D->getType().getNonReferenceType().isConstQualified());
+    }
     void insertContextsByVariable(clang::Stmt const * const S, clang::VarDecl const * const D) {
-        if (! D->getType().isConstQualified()) {
+        if (is_non_const(D)) {
             ContextsByVariable::iterator It = Ctxs.find(D);
             if (Ctxs.end() == It) {
                 std::pair<ContextsByVariable::iterator, bool> Result = Ctxs.insert(ContextsByVariable::value_type(D, Contexts()));
@@ -173,7 +176,7 @@ private:
         }
     }
     void insertVariablesByContext(clang::VarDecl const * const D, clang::Stmt const * const S) {
-        if (! D->getType().isConstQualified()) {
+        if (is_non_const(D)) {
             VariablesByContext::iterator It = Vars.find(S);
             if (Vars.end() == It) {
                 std::pair<VariablesByContext::iterator, bool> Result = Vars.insert(VariablesByContext::value_type(S, Variables()));
