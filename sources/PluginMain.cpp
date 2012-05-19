@@ -95,6 +95,17 @@ public:
         return true;
     }
 
+    bool VisitCallExpr(clang::CallExpr const * const CE) {
+        for (clang::CallExpr::const_arg_iterator AIt(CE->arg_begin()), AEnd(CE->arg_end()); AIt != AEnd; ++AIt ) {
+            if (clang::DeclRefExpr const * const DE = clang::dyn_cast<clang::DeclRefExpr>(*AIt)) {
+                if (clang::VarDecl const * const VD = clang::dyn_cast<clang::VarDecl>(DE->getDecl())) {
+                    NonConstants.insert(VD);
+                }
+            }
+        }
+        return true;
+    }
+
     Variables const & getNonConstVariables() const {
         return NonConstants;
     }

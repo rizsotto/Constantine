@@ -22,6 +22,6 @@ namespace {
         { int k = 1; inc_ref(k); }
         { int k = 1; inc_const_ref(k); } // expected-warning {{variable could be declared as const [Medve plugin]}}
         { int k = 1; inc_p(&k); }
-        { int k = 1; inc_const_p(&k); } // expected-warning {{variable could be declared as const [Medve plugin]}}
+        { int k = 1; inc_const_p(&k); }
     }
 }
