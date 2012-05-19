@@ -50,13 +50,11 @@ public:
         case clang::BO_OrAssign:
         case clang::BO_XorAssign:
         case clang::BO_ShlAssign:
-        case clang::BO_ShrAssign: {
-            clang::VarDecl const * const VD = clang::dyn_cast<clang::VarDecl>(LHSDecl);
-            if (VD) {
+        case clang::BO_ShrAssign:
+            if (clang::VarDecl const * const VD = clang::dyn_cast<clang::VarDecl>(LHSDecl)) {
                 NonConstants.insert(VD);
             }
             break;
-        }
         default:
             break;
         }
@@ -74,13 +72,11 @@ public:
         case clang::UO_PostInc:
         case clang::UO_PreDec:
         case clang::UO_PreInc:
-        case clang::UO_AddrOf: {
-            clang::VarDecl const * const VD = clang::dyn_cast<clang::VarDecl>(D);
-            if (VD) {
+        case clang::UO_AddrOf:
+            if (clang::VarDecl const * const VD = clang::dyn_cast<clang::VarDecl>(D)) {
                 NonConstants.insert(VD);
             }
             break;
-        }
         default:
             break;
         }
