@@ -93,10 +93,16 @@ public:
 
     bool VisitCallExpr(clang::CallExpr const * const CE) {
         for (clang::CallExpr::const_arg_iterator AIt(CE->arg_begin()), AEnd(CE->arg_end()); AIt != AEnd; ++AIt ) {
-            if (clang::DeclRefExpr const * const DE = clang::dyn_cast<clang::DeclRefExpr>(*AIt)) {
-                if (clang::VarDecl const * const VD = clang::dyn_cast<clang::VarDecl>(DE->getDecl())) {
-                    NonConstants.insert(VD);
-                }
+            insertWhenReferedWithoutCast(*AIt);
+        }
+        return true;
+    }
+
+    bool VisitMemberExpr(clang::MemberExpr const * const CE) {
+        clang::Type const * const T = CE->getMemberDecl()->getType().getCanonicalType().getTypePtr();
+        if (clang::FunctionProtoType const * const F = T->getAs<clang::FunctionProtoType>()) {
+            if (! (F->getTypeQuals() & clang::Qualifiers::Const) ) {
+                insertWhenReferedWithoutCast(CE->getBase());
             }
         }
         return true;
@@ -110,10 +116,13 @@ private:
     void checkRefDeclaration(clang::Decl const * const Decl) {
         clang::VarDecl const * const VD = clang::dyn_cast<clang::VarDecl const>(Decl);
         if ((VD) && (VD->getType().getTypePtr()->isReferenceType())) {
-            if (clang::Decl const * const D = getDecl(VD->getInit()->IgnoreParenCasts())) {
-                if (clang::VarDecl const * const RefVD = clang::dyn_cast<clang::VarDecl const>(D)) {
-                    NonConstants.insert(RefVD);
-                }
+            insertWhenReferedWithoutCast(VD->getInit()->IgnoreParenCasts());
+        }
+    }
+    void insertWhenReferedWithoutCast(clang::Expr const * E) {
+        if (clang::DeclRefExpr const * const DE = clang::dyn_cast<clang::DeclRefExpr>(E)) {
+            if (clang::VarDecl const * const VD = clang::dyn_cast<clang::VarDecl>(DE->getDecl())) {
+                NonConstants.insert(VD);
             }
         }
     }
