@@ -102,7 +102,7 @@ public:
         clang::Type const * const T = CE->getMemberDecl()->getType().getCanonicalType().getTypePtr();
         if (clang::FunctionProtoType const * const F = T->getAs<clang::FunctionProtoType>()) {
             if (! (F->getTypeQuals() & clang::Qualifiers::Const) ) {
-                insertWhenReferedWithoutCast(CE->getBase());
+                insertWhenReferedWithoutCast(CE);
             }
         }
         return true;
@@ -120,8 +120,8 @@ private:
         }
     }
     void insertWhenReferedWithoutCast(clang::Expr const * E) {
-        if (clang::DeclRefExpr const * const DE = clang::dyn_cast<clang::DeclRefExpr>(E)) {
-            if (clang::VarDecl const * const VD = clang::dyn_cast<clang::VarDecl>(DE->getDecl())) {
+        if (clang::Decl const * const D = getDecl(E)) {
+            if (clang::VarDecl const * const VD = clang::dyn_cast<clang::VarDecl>(D)) {
                 NonConstants.insert(VD);
             }
         }
