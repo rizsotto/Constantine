@@ -47,6 +47,12 @@ struct Public {
     int m_id;
 };
 
+void change(int & k)
+{ ++k; }
+
+void dont_change(int const & k)
+{ }
+
 void test_access() {
     {
         Public s = { 2 }; // expected-warning {{variable could be declared as const [Medve plugin]}}
@@ -55,5 +61,22 @@ void test_access() {
     {
         Public s = { 2 };
         s.m_id = 3;
+    }
+    {
+        Public s = { 2 }; // expected-warning {{variable could be declared as const [Medve plugin]}}
+        int const & k = s.m_id;
+    }
+    {
+        Public s = { 2 };
+        int & k = s.m_id;
+        k = 3;
+    }
+    {
+        Public s = { 2 }; // expected-warning {{variable could be declared as const [Medve plugin]}}
+        dont_change( s.m_id );
+    }
+    {
+        Public s = { 2 };
+        change( s.m_id );
     }
 }

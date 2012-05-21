@@ -21,6 +21,14 @@ typedef std::set<clang::VarDecl const *> Variables;
 typedef std::map<clang::Stmt const *, Variables> VariablesByContext;
 typedef std::map<clang::VarDecl const *, Contexts> ContextsByVariable;
 
+bool is_non_const(clang::VarDecl const * const D) {
+    return (! (D->getType().getNonReferenceType().isConstQualified()));
+}
+
+bool is_reference(clang::VarDecl const * const D) {
+    return (D->getType().getTypePtr()->isReferenceType());
+}
+
 class ConstantAnalysis : public clang::RecursiveASTVisitor<ConstantAnalysis> {
     Variables NonConstants;
 public:
@@ -114,9 +122,10 @@ public:
 
 private:
     void checkRefDeclaration(clang::Decl const * const Decl) {
-        clang::VarDecl const * const VD = clang::dyn_cast<clang::VarDecl const>(Decl);
-        if ((VD) && (VD->getType().getTypePtr()->isReferenceType())) {
-            insertWhenReferedWithoutCast(VD->getInit()->IgnoreParenCasts());
+        if (clang::VarDecl const * const VD = clang::dyn_cast<clang::VarDecl const>(Decl)) {
+            if (is_reference(VD) && is_non_const(VD)) {
+                insertWhenReferedWithoutCast(VD->getInit()->IgnoreParenCasts());
+            }
         }
     }
     void insertWhenReferedWithoutCast(clang::Expr const * E) {
@@ -178,9 +187,6 @@ public:
     }
 
 private:
-    static bool is_non_const(clang::VarDecl const * const D) {
-        return (! D->getType().getNonReferenceType().isConstQualified());
-    }
     void insertContextsByVariable(clang::Stmt const * const S, clang::VarDecl const * const D) {
         if (is_non_const(D)) {
             ContextsByVariable::iterator It = Ctxs.find(D);
