@@ -2,18 +2,18 @@
 
 namespace {
 
-    int j = 9; // expected-warning {{variable could be declared as const [Medve plugin]}}
+    int vary = 9; // expected-warning {{variable could be declared as const [Medve plugin]}}
 
-    int add(int) { return j; }
+    int foo(int) { return vary; }
 
     namespace zone {
     
-        int add(int);
+        int add_constant(int);
 
-        int add(int const k) { return k + j; }
+        int add_constant(int const konst) { return konst + vary; }
 
-        int k = 1; // expected-warning {{variable could be declared as const [Medve plugin]}}
+        int vary = 1; // expected-warning {{variable could be declared as const [Medve plugin]}}
     }
 
-    int inc(int) { return zone::k; }
+    int bar(int) { return zone::vary; }
 }

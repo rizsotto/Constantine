@@ -24,6 +24,14 @@ void big_test_method()
 }
 
 namespace {
-    void other_method()
+    void test_method_in_namespace()
     { int k = 1; inc(k); } // expected-warning {{variable could be declared as const [Medve plugin]}}
+}
+
+void reference_to_reference_test()
+{
+    int k = 1;
+    int & j = k;
+    int & l = j; // expected-warning {{variable could be declared as const [Medve plugin]}}
+    int const m = inc(l);
 }

@@ -16,12 +16,12 @@ int inc_const_p(int const * const k)
 { return *k + 1; }
 
 namespace {
-    void other_method()
+    void test_function_call()
     {
-        { int k = 1; inc(k); } // expected-warning {{variable could be declared as const [Medve plugin]}}
-        { int k = 1; inc_ref(k); }
-        { int k = 1; inc_const_ref(k); } // expected-warning {{variable could be declared as const [Medve plugin]}}
-        { int k = 1; inc_p(&k); }
-        { int k = 1; inc_const_p(&k); }
+        { int konst = 1; inc(konst); } // expected-warning {{variable could be declared as const [Medve plugin]}}
+        { int vary = 1; inc_ref(vary); }
+        { int konst = 1; inc_const_ref(konst); } // expected-warning {{variable could be declared as const [Medve plugin]}}
+        { int vary = 1; inc_p(&vary); }
+        { int konst = 1; inc_const_p(&konst); } // would be nice
     }
 }
