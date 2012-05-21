@@ -27,9 +27,7 @@ int Simple::getId() const
 Simple & Simple::setId(int const id)
 { m_id = id; return *this; }
 
-
-void test_method()
-{
+void test_method() {
     {
         Simple s; // expected-warning {{variable could be declared as const [Medve plugin]}}
         int const k = s.getId();
@@ -37,5 +35,25 @@ void test_method()
     {
         Simple s;
         s.setId(2);
+    }
+    {
+        Simple s;
+        s.setId(2).setId(3);
+    }
+}
+
+
+struct Public {
+    int m_id;
+};
+
+void test_access() {
+    {
+        Public s = { 2 }; // expected-warning {{variable could be declared as const [Medve plugin]}}
+        int const id = s.m_id;
+    }
+    {
+        Public s = { 2 };
+        s.m_id = 3;
     }
 }

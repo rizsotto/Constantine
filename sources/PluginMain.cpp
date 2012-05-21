@@ -127,9 +127,11 @@ private:
         }
     }
 
-    static clang::Decl const * getDecl(clang::Expr const * E) {
-        if (clang::DeclRefExpr const * DR = clang::dyn_cast<clang::DeclRefExpr const>(E)) {
+    static clang::Decl const * getDecl(clang::Expr const * const E) {
+        if (clang::DeclRefExpr const * const DR = clang::dyn_cast<clang::DeclRefExpr const>(E)) {
             return DR->getDecl();
+        } else if (clang::MemberExpr const * const ME = clang::dyn_cast<clang::MemberExpr>(E)) {
+            return getDecl(ME->getBase());
         }
         return 0;
     }
