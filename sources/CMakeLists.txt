@@ -3,7 +3,10 @@
 set(ourlib_target Medve)
 
 set(ourlib_sources
+    ConstantAnalysis.cpp
+    DeclarationCollector.cpp
     PluginMain.cpp
+    VariableChecker.cpp
 )
 
 set(ourlib_symbols ExportedSymbolsList)
