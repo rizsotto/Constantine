@@ -1,1 +1,6 @@
-_ZN4llvm8Registry*
+{
+    global:
+        _ZN4llvm8Registry*;
+    local:
+        *;
+};
