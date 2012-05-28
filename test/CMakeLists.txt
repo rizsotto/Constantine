@@ -4,7 +4,7 @@ configure_file(
   @ONLY)
 
 add_custom_target(check
-  COMMAND llvm-lit .
+  COMMAND ${LLVM_LIT} .
   COMMENT "Running regression tests")
 add_dependencies(check
   Medve)
