@@ -9,8 +9,10 @@ find_program(LLVM_CONFIG llvm-config
     PATH ENV LLVM_PATH)
 find_program(LLVM_LIT llvm-lit
     PATH ENV LLVM_PATH)
+find_program(CLANG_BIN clang
+    PATH ENV LLVM_PATH)
 
-if (LLVM_CONFIG AND LLVM_LIT)
+if (LLVM_CONFIG AND LLVM_LIT AND CLANG_BIN)
   execute_process(COMMAND ${LLVM_CONFIG} --version OUTPUT_VARIABLE llvm_version OUTPUT_STRIP_TRAILING_WHITESPACE)
   execute_process(COMMAND ${LLVM_CONFIG} --src-root OUTPUT_VARIABLE llvm_src_dir OUTPUT_STRIP_TRAILING_WHITESPACE)
   execute_process(COMMAND ${LLVM_CONFIG} --obj-root OUTPUT_VARIABLE llvm_obj_dir OUTPUT_STRIP_TRAILING_WHITESPACE)
