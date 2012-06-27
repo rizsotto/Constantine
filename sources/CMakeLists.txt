@@ -15,7 +15,7 @@ set(ourlib_symbols ${CMAKE_CURRENT_SOURCE_DIR}/ExportedSymbolsList)
 add_library(${ourlib_target} SHARED ${ourlib_sources})
 
 include_directories(${CLANG_INCLUDE_DIRS})
-add_definitions(${CLANG_DEFINES})
+add_definitions(${CLANG_DEFINITIONS})
 
 set_target_properties(${ourlib_target} PROPERTIES
     LINKER_LANGUAGE CXX)

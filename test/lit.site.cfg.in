@@ -3,6 +3,6 @@
 config.medve_src_root = "@CMAKE_SOURCE_DIR@"
 config.medve_obj_root = "@CMAKE_BINARY_DIR@"
 
-config.clang_bin = "@CLANG_BIN@"
+config.clang_bin = "@CLANG_EXECUTABLE@"
 
 lit.load_config(config, "@CMAKE_CURRENT_SOURCE_DIR@/lit.cfg")
