@@ -44,22 +44,33 @@ endfunction()
 
 
 find_program(LLVM_CONFIG llvm-config
-    PATH ENV LLVM_PATH)
-find_program(LLVM_LIT llvm-lit
-    PATH ENV LLVM_PATH)
-find_program(CLANG_EXECUTABLE clang
-    PATH ENV LLVM_PATH)
-
-if (LLVM_CONFIG AND LLVM_LIT AND CLANG_EXECUTABLE)
-  set_clang_cxx_flags(${LLVM_CONFIG})
-  set_clang_include_dirs(${LLVM_CONFIG})
-
+    PATHS ENV LLVM_PATH)
+if(LLVM_CONFIG)
   message(STATUS "llvm-config found : ${LLVM_CONFIG}")
-  message(STATUS "llvm-lit found : ${LLVM_LIT}")
-  message(STATUS "clang found : ${CLANG_EXECUTABLE}")
-  message(STATUS "llvm-config filtered cpp flags : ${CLANG_DEFINITIONS}")
-
-  set(CLANG_FOUND 1)
 else()
-  message(FATAL_ERROR "llvm programs not found. LLVM_PATH environment variable.")
+  message(FATAL_ERROR "Can't found program: llvm-config")
 endif()
+
+find_program(LLVM_LIT llvm-lit
+    PATHS ENV LLVM_PATH)
+if(LLVM_LIT)
+  message(STATUS "llvm-lit found : ${LLVM_LIT}")
+else()
+  message(FATAL_ERROR "Can't found program: llvm-lit")
+endif()
+
+find_program(CLANG_EXECUTABLE clang
+    PATHS ENV LLVM_PATH)
+if(CLANG_EXECUTABLE)
+  message(STATUS "clang found : ${CLANG_EXECUTABLE}")
+else()
+  message(FATAL_ERROR "Can't found program: clang")
+endif()
+
+set_clang_cxx_flags(${LLVM_CONFIG})
+set_clang_include_dirs(${LLVM_CONFIG})
+
+message(STATUS "llvm-config filtered cpp flags : ${CLANG_DEFINITIONS}")
+message(STATUS "llvm-config filtered include dirs : ${CLANG_INCLUDE_DIRS}")
+
+set(CLANG_FOUND 1)
