@@ -1,18 +1,14 @@
 // RUN: %clang_cc1 %s -fsyntax-only -verify
 
-int inc(int k) {
-    return ++k;
-}
-
-void big_test_method() {
-    int k = 1; // expected-warning {{variable could be declared as const [Medve plugin]}}
-    inc(k);
+int test_method() {
+    int k = 1; // expected-warning {{variable could be declared as const}}
+    return (k == 9) ? 1 : 2;
 }
 
 namespace {
-    void test_method_in_namespace() {
+    int test_method_in_namespace() {
         int k = 1; // expected-warning {{variable could be declared as const [Medve plugin]}}
-        inc(k);
+        return (k == 9) ? 1 : 2;
     }
 }
 

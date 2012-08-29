@@ -1,12 +1,8 @@
 // RUN: %clang_cc1 %s -fsyntax-only -verify
 
-int inc(int k) {
-    return ++k;
-}
-
 void binary_operator_test() {
     { int k = 0; k = 1; }
-    { int k = 0; k = k; } // expected-warning {{variable could be declared as const [Medve plugin]}}
+    { int k = 0; k = k; } // expected-warning {{variable could be declared as const}}
     { int k = 2; k += 2; }
     { int k = 2; k -= 2; }
     { int k = 2; k *= 2; }
