@@ -125,7 +125,7 @@ void ConstantAnalysis::checkRefDeclaration(clang::Decl const * const Decl) {
     }
 }
 
-void ConstantAnalysis::insertWhenReferedWithoutCast(clang::Expr const * E) {
+void ConstantAnalysis::insertWhenReferedWithoutCast(clang::Expr const * const E) {
     if (clang::Decl const * const D = getDecl(E)) {
         if (clang::VarDecl const * const VD = clang::dyn_cast<clang::VarDecl>(D)) {
             NonConstants.insert(VD);

@@ -52,7 +52,7 @@ void DeclarationCollector::insertContextsByVariable(clang::Stmt const * const S,
     if (is_non_const(D)) {
         ContextsByVariable::iterator It = Ctxs.find(D);
         if (Ctxs.end() == It) {
-            std::pair<ContextsByVariable::iterator, bool> Result = Ctxs.insert(ContextsByVariable::value_type(D, Contexts()));
+            std::pair<ContextsByVariable::iterator, bool> const Result = Ctxs.insert(ContextsByVariable::value_type(D, Contexts()));
             assert(Result.second);
             It = Result.first;
             assert(Ctxs.end() != It);
@@ -65,7 +65,7 @@ void DeclarationCollector::insertVariablesByContext(clang::VarDecl const * const
     if (is_non_const(D)) {
         VariablesByContext::iterator It = Vars.find(S);
         if (Vars.end() == It) {
-            std::pair<VariablesByContext::iterator, bool> Result = Vars.insert(VariablesByContext::value_type(S, Variables()));
+            std::pair<VariablesByContext::iterator, bool> const Result = Vars.insert(VariablesByContext::value_type(S, Variables()));
             assert(Result.second);
             It = Result.first;
             assert(Vars.end() != It);

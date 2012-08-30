@@ -23,8 +23,7 @@ class MedvePlugin : public clang::PluginASTAction {
 
         return (Opts.CPlusPlus) || (Opts.CPlusPlus0x);
     }
-    clang::ASTConsumer * CreateASTConsumer(clang::CompilerInstance & Compiler,
-                                           llvm::StringRef) {
+    clang::ASTConsumer * CreateASTConsumer(clang::CompilerInstance & Compiler, llvm::StringRef) {
         return isCPlusPlus(Compiler)
             ? (clang::ASTConsumer *) new VariableChecker(Compiler)
             : (clang::ASTConsumer *) new NullConsumer();
