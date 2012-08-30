@@ -3,16 +3,16 @@
 void pointer_declaration_test() {
     int k = 0;
 
-    int * p1 = &k; // expected-warning {{variable could be declared as const}}
+    int * p1 = &k; // expected-warning {{variable 'p1' could be declared as const}}
     int * const p2 = &k;
-    int const * p3 = &k; // expected-warning {{variable could be declared as const}}
+    int const * p3 = &k; // expected-warning {{variable 'p3' could be declared as const}}
 }
 
 void pointer_pointer_declaration_test() {
     int k = 0;
 
     int * const p1 = &k;
-    int * const * pp1 = &p1; // expected-warning {{variable could be declared as const}}
+    int * const * pp1 = &p1; // expected-warning {{variable 'pp1' could be declared as const}}
 }
 
 int use_argument_via_const_pointer(int const * const k) {

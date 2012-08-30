@@ -35,10 +35,14 @@ bool check(VariablesByContext const & AllCtxs, ContextsByVariable::value_type co
 }
 
 void report(clang::DiagnosticsEngine & DiagEng, ContextsByVariable::value_type const It) {
-    char const * const Msg = "variable could be declared as const [Medve plugin]";
-    unsigned const DiagID =
-        DiagEng.getCustomDiagID(clang::DiagnosticsEngine::Warning, Msg);
     clang::VarDecl const * const Decl = It.first;
+
+    std::string Msg;
+    Msg += "variable '";
+    Msg += Decl->getNameAsString();
+    Msg += "' could be declared as const [Medve plugin]";
+
+    unsigned const DiagID = DiagEng.getCustomDiagID(clang::DiagnosticsEngine::Warning, Msg.c_str());
     DiagEng.Report(Decl->getLocStart(), DiagID);
 }
 

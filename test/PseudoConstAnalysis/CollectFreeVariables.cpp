@@ -1,16 +1,16 @@
 // RUN: %clang_cc1 %s -fsyntax-only -verify
 
 namespace {
-    int a_k = 9; // expected-warning {{variable could be declared as const}}
+    int a_k = 9; // expected-warning {{variable 'a_k' could be declared as const}}
 }
 
 namespace zone {
-    int k = 9; // expected-warning {{variable could be declared as const}}
+    int k = 9; // expected-warning {{variable 'k' could be declared as const}}
 }
 
 namespace zone {
   namespace inner {
-    int k = 9; // expected-warning {{variable could be declared as const}}
+    int k = 9; // expected-warning {{variable 'k' could be declared as const}}
   }
 }
 

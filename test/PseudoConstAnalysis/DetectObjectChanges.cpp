@@ -19,7 +19,7 @@ void member_access_test() {
     };
 
     {
-        Public s = { 2 }; // expected-warning {{variable could be declared as const}}
+        Public s = { 2 }; // expected-warning {{variable 's' could be declared as const}}
         int const id = s.m_id;
     }
     {
@@ -27,7 +27,7 @@ void member_access_test() {
         s.m_id = 3;
     }
     {
-        Public s = { 2 }; // expected-warning {{variable could be declared as const}}
+        Public s = { 2 }; // expected-warning {{variable 's' could be declared as const}}
         int const & k = s.m_id;
     }
     {
@@ -36,7 +36,7 @@ void member_access_test() {
         k = 3;
     }
     {
-        Public s = { 2 }; // expected-warning {{variable could be declared as const}}
+        Public s = { 2 }; // expected-warning {{variable 's' could be declared as const}}
         use_argument_via_const_reference( s.m_id );
     }
     {
@@ -67,7 +67,7 @@ void method_call_test() {
 
     // by value
     {
-        Simple s; // expected-warning {{variable could be declared as const}}
+        Simple s; // expected-warning {{variable 's' could be declared as const}}
         int const k = s.getId();
     }
     {
@@ -80,13 +80,13 @@ void method_call_test() {
     }
     // by reference
     {
-        Simple s; // expected-warning {{variable could be declared as const}}
+        Simple s; // expected-warning {{variable 's' could be declared as const}}
         Simple const & k = s;
         int const l = k.getId();
     }
     {
         Simple s; // would be good
-        Simple & k = s; // expected-warning {{variable could be declared as const}}
+        Simple & k = s; // expected-warning {{variable 'k' could be declared as const}}
         int const l = k.getId();
     }
     {
