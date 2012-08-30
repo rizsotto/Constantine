@@ -14,29 +14,32 @@
 
 namespace {
 
-VariablesByContext::value_type analyse(VariablesByContext::value_type const In) {
-    ConstantAnalysis Analysis;
-    Analysis.TraverseStmt(const_cast<clang::Stmt*>(In.first));
-    return VariablesByContext::value_type(In.first, Analysis.getNonConstVariables());
+typedef std::map<clang::Stmt const *, ConstantAnalysis::ConstPtr> AnalyzersByContext;
+
+inline
+AnalyzersByContext::value_type analyse(VariablesByContext::value_type const & In) {
+    return AnalyzersByContext::value_type(In.first, ConstantAnalysis::AnalyseThis(*In.first));
 }
 
-bool check(VariablesByContext const & AllCtxs, ContextsByVariable::value_type const It) {
+bool pseudo_constness_check(ContextsByVariable::value_type const & It, AnalyzersByContext const & Analyzers) {
     clang::VarDecl const * const Var = It.first;
     Contexts const & Visibles = It.second;
-    for (Contexts::const_iterator It(Visibles.begin()), End(Visibles.end());
-        End != It; ++It) {
-        VariablesByContext::const_iterator const CtxIt = AllCtxs.find(*It);
-        assert(AllCtxs.end() != CtxIt);
-        if (CtxIt->second.count(Var)) {
-            return true;
+    // go through all scopes where Var is visible
+    for (Contexts::const_iterator CtxIt(Visibles.begin()), CtxEnd(Visibles.end());
+        CtxEnd != CtxIt; ++CtxIt) {
+        // check the scope related analysis
+        AnalyzersByContext::const_iterator const AnalyzerIt = Analyzers.find(*CtxIt);
+        assert(Analyzers.end() != AnalyzerIt);
+        ConstantAnalysis const & Analyzer = *(AnalyzerIt->second);
+        // pseudo const only iff it was not changed any of the scopes
+        if (Analyzer.WasChanged(Var)) {
+            return false;
         }
     }
-    return false;
+    return true;
 }
 
-void report(clang::DiagnosticsEngine & DiagEng, ContextsByVariable::value_type const It) {
-    clang::VarDecl const * const Decl = It.first;
-
+void report(clang::DiagnosticsEngine & DiagEng, clang::VarDecl const * const Decl) {
     std::string Msg;
     Msg += "variable '";
     Msg += Decl->getNameAsString();
@@ -55,16 +58,26 @@ VariableChecker::VariableChecker(clang::CompilerInstance const & Compiler)
 { }
 
 void VariableChecker::HandleTranslationUnit(clang::ASTContext & Ctx) {
+    // Collect declarations and their scopes
     DeclarationCollector Collector;
     Collector.TraverseDecl(Ctx.getTranslationUnitDecl());
-
-    VariablesByContext const & Input = Collector.getVariablesByContext();
-    VariablesByContext Output;
-    std::insert_iterator<VariablesByContext> const OutputIt(Output, Output.begin());
-    std::transform(Input.begin(), Input.end(), OutputIt, analyse);
-    ContextsByVariable const & Candidates = Collector.getContextsByVariable();
-    ContextsByVariable Result;
-    std::insert_iterator<ContextsByVariable> const ResultIt(Result, Result.begin());
-    std::remove_copy_if(Candidates.begin(), Candidates.end(), ResultIt, std::bind1st(std::ptr_fun(check), Output));
+    // Run analysis on all scopes
+    AnalyzersByContext Analyzers;
+    {
+        VariablesByContext const & Input = Collector.getVariablesByContext();
+        std::insert_iterator<AnalyzersByContext> const AnalyzersIt(Analyzers, Analyzers.begin());
+        std::transform(Input.begin(), Input.end(), AnalyzersIt, analyse);
+    }
+    // Get variables where analyses were diagnose pseudo constness
+    Variables Result;
+    {
+        ContextsByVariable const & Candidates = Collector.getContextsByVariable();
+        for (ContextsByVariable::const_iterator It(Candidates.begin()), End(Candidates.end()); It != End; ++It) {
+            if (pseudo_constness_check(*It, Analyzers)) {
+                Result.insert(It->first);
+            }
+        }
+    }
+    // Print out the results
     std::for_each(Result.begin(), Result.end(), std::bind1st(std::ptr_fun(report), DiagEng));
 }

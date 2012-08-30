@@ -27,11 +27,27 @@ clang::Decl const * getDecl(clang::Expr const * const E) {
 
 } // namespace anonymous
 
+ConstantAnalysis::ConstPtr ConstantAnalysis::AnalyseThis(clang::Stmt const & Stmt) {
+    std::auto_ptr<ConstantAnalysis> Analysis(new ConstantAnalysis());
+    Analysis->TraverseStmt(const_cast<clang::Stmt*>(&Stmt));
+
+    return ConstantAnalysis::ConstPtr(Analysis.release());
+}
 
 ConstantAnalysis::ConstantAnalysis()
 : clang::RecursiveASTVisitor<ConstantAnalysis>()
-, NonConstants()
+, Changed()
+, Used()
 { }
+
+bool ConstantAnalysis::WasChanged(clang::VarDecl const * const Decl) const {
+    return (Changed.end() != Changed.find(Decl));
+}
+
+bool ConstantAnalysis::WasReferenced(clang::VarDecl const * const Decl) const {
+    return (Used.end() != Used.find(Decl));
+}
+
 
 bool ConstantAnalysis::VisitBinaryOperator(clang::BinaryOperator const * const BO) {
     clang::Decl const * const LHSDecl =
@@ -57,7 +73,7 @@ bool ConstantAnalysis::VisitBinaryOperator(clang::BinaryOperator const * const B
     case clang::BO_ShlAssign:
     case clang::BO_ShrAssign:
         if (clang::VarDecl const * const VD = clang::dyn_cast<clang::VarDecl>(LHSDecl)) {
-            NonConstants.insert(VD);
+            Changed.insert(VD);
         }
         break;
     default:
@@ -79,7 +95,7 @@ bool ConstantAnalysis::VisitUnaryOperator(clang::UnaryOperator const * const UO)
     case clang::UO_PreInc:
     case clang::UO_AddrOf:
         if (clang::VarDecl const * const VD = clang::dyn_cast<clang::VarDecl>(D)) {
-            NonConstants.insert(VD);
+            Changed.insert(VD);
         }
         break;
     default:
@@ -113,10 +129,6 @@ bool ConstantAnalysis::VisitMemberExpr(clang::MemberExpr const * const CE) {
     return true;
 }
 
-Variables const & ConstantAnalysis::getNonConstVariables() const {
-    return NonConstants;
-}
-
 void ConstantAnalysis::checkRefDeclaration(clang::Decl const * const Decl) {
     if (clang::VarDecl const * const VD = clang::dyn_cast<clang::VarDecl const>(Decl)) {
         if (is_reference(VD) && is_non_const(VD)) {
@@ -128,7 +140,7 @@ void ConstantAnalysis::checkRefDeclaration(clang::Decl const * const Decl) {
 void ConstantAnalysis::insertWhenReferedWithoutCast(clang::Expr const * const E) {
     if (clang::Decl const * const D = getDecl(E)) {
         if (clang::VarDecl const * const VD = clang::dyn_cast<clang::VarDecl>(D)) {
-            NonConstants.insert(VD);
+            Changed.insert(VD);
         }
     }
 }
