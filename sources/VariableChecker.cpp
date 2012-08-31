@@ -14,7 +14,7 @@
 
 namespace {
 
-typedef std::map<clang::Stmt const *, ConstantAnalysis::ConstPtr> AnalyzersByContext;
+typedef std::map<clang::Stmt const *, const ConstantAnalysis> AnalyzersByContext;
 
 inline
 AnalyzersByContext::value_type analyse(VariablesByContext::value_type const & In) {
@@ -30,7 +30,7 @@ bool pseudo_constness_check(ContextsByVariable::value_type const & It, Analyzers
         // check the scope related analysis
         AnalyzersByContext::const_iterator const AnalyzerIt = Analyzers.find(*CtxIt);
         assert(Analyzers.end() != AnalyzerIt);
-        ConstantAnalysis const & Analyzer = *(AnalyzerIt->second);
+        ConstantAnalysis const & Analyzer = AnalyzerIt->second;
         // pseudo const only iff it was not changed any of the scopes
         if (Analyzer.WasChanged(Var)) {
             return false;
