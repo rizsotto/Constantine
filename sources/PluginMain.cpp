@@ -1,7 +1,5 @@
 // Copyright 2012 by Laszlo Nagy [see file MIT-LICENSE]
 
-#include "ConstantAnalysis.hpp"
-#include "DeclarationCollector.hpp"
 #include "VariableChecker.hpp"
 
 #include <clang/Frontend/FrontendPluginRegistry.h>
@@ -10,6 +8,7 @@
 
 namespace {
 
+// Do nothing, just enjoy the non C++ code.
 class NullConsumer : public clang::ASTConsumer {
 public:
     NullConsumer()
@@ -17,14 +16,15 @@ public:
     { }
 };
 
-class MedvePlugin : public clang::PluginASTAction {
-    static bool isCPlusPlus(clang::CompilerInstance const & Compiler) {
+class Plugin : public clang::PluginASTAction {
+private:
+    static bool IsCPlusPlus(clang::CompilerInstance const & Compiler) {
         clang::LangOptions const Opts = Compiler.getLangOpts();
-
         return (Opts.CPlusPlus) || (Opts.CPlusPlus0x);
     }
+
     clang::ASTConsumer * CreateASTConsumer(clang::CompilerInstance & Compiler, llvm::StringRef) {
-        return isCPlusPlus(Compiler)
+        return IsCPlusPlus(Compiler)
             ? (clang::ASTConsumer *) new VariableChecker(Compiler)
             : (clang::ASTConsumer *) new NullConsumer();
     }
@@ -37,5 +37,5 @@ class MedvePlugin : public clang::PluginASTAction {
 
 } // namespace anonymous
 
-static clang::FrontendPluginRegistry::Add<MedvePlugin>
-    MedvePluginRegistry("medve", "suggest const usage");
+static clang::FrontendPluginRegistry::Add<Plugin>
+    Register("medve", "suggest const usage");

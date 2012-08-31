@@ -18,6 +18,10 @@ bool is_reference(clang::VarDecl const * const D) {
     return (D->getType().getTypePtr()->isReferenceType());
 }
 
+// FIXME: extract clang::Decl from an clang::Expr, but only if
+// it is variable access or member access. Don't we have a better
+// name for it? And shall it be that specific, although the name
+// is so generic?
 clang::Decl const * getDecl(clang::Expr const * const E) {
     if (clang::DeclRefExpr const * const DR = clang::dyn_cast<clang::DeclRefExpr const>(E)) {
         return DR->getDecl();
@@ -29,13 +33,16 @@ clang::Decl const * getDecl(clang::Expr const * const E) {
 
 typedef std::set<clang::VarDecl const *> Variables;
 
+// Collect all variables which were mutated in the given scope.
+// (The scope is given by the TraverseStmt method.)
 class VariableChangeCollector : public clang::RecursiveASTVisitor<VariableChangeCollector> {
 public:
     VariableChangeCollector(Variables & In)
-    : clang::RecursiveASTVisitor<VariableChangeCollector>()
-    , Changed(In)
+        : clang::RecursiveASTVisitor<VariableChangeCollector>()
+        , Changed(In)
     { }
 
+    // Assignments are mutating variables.
     bool VisitBinaryOperator(clang::BinaryOperator const * const BO) {
         clang::Decl const * const LHSDecl =
             getDecl(BO->getLHS()->IgnoreParenCasts());
@@ -69,6 +76,7 @@ public:
         return true;
     }
 
+    // Some operator does mutate variables.
     bool VisitUnaryOperator(clang::UnaryOperator const * const UO) {
         clang::Decl const * const D =
             getDecl(UO->getSubExpr()->IgnoreParenCasts());
@@ -80,6 +88,7 @@ public:
         case clang::UO_PostInc:
         case clang::UO_PreDec:
         case clang::UO_PreInc:
+        // FIXME: Address-Of ruin the whole pointer business...
         case clang::UO_AddrOf:
             if (clang::VarDecl const * const VD = clang::dyn_cast<clang::VarDecl>(D)) {
                 Changed.insert(VD);
@@ -91,6 +100,8 @@ public:
         return true;
     }
 
+    // FIXME: These are suppose to be those cases when _new_ variables 
+    // are declared, but not when they were changed. Is it correct?
     bool VisitDeclStmt(clang::DeclStmt const * const DS) {
         clang::DeclGroupRef const & DG = DS->getDeclGroup();
         for (clang::DeclGroupRef::const_iterator It(DG.begin()), End(DG.end()); It != End; ++It) {
@@ -99,6 +110,7 @@ public:
         return true;
     }
 
+    // Variables potentially mutated when you pass by-pointer or by-reference.
     bool VisitCallExpr(clang::CallExpr const * const CE) {
         for (clang::CallExpr::const_arg_iterator AIt(CE->arg_begin()), AEnd(CE->arg_end()); AIt != AEnd; ++AIt ) {
             insertWhenReferedWithoutCast(*AIt);
@@ -106,6 +118,7 @@ public:
         return true;
     }
 
+    // Variables are mutated if non-const member function called.
     bool VisitMemberExpr(clang::MemberExpr const * const CE) {
         clang::Type const * const T = CE->getMemberDecl()->getType().getCanonicalType().getTypePtr();
         if (clang::FunctionProtoType const * const F = T->getAs<clang::FunctionProtoType>()) {
@@ -126,6 +139,7 @@ private:
         }
     }
 
+    // FIXME: explain it with clang AST examples.
     inline
     void insertWhenReferedWithoutCast(clang::Expr const * const E) {
         if (clang::Decl const * const D = getDecl(E)) {
@@ -137,29 +151,31 @@ private:
 
 private:
     Variables & Changed;
-
-private:
-    VariableChangeCollector(VariableChangeCollector const &);
-    VariableChangeCollector & operator=(VariableChangeCollector const &);
 };
 
+// Collect all variables which were accessed in the given scope.
+// (The scope is given by the TraverseStmt method.)
 class VariableAccessCollector : public clang::RecursiveASTVisitor<VariableAccessCollector> {
 public:
-    VariableAccessCollector(Variables & In)
-    : clang::RecursiveASTVisitor<VariableAccessCollector>()
-    , Used(In)
+    VariableAccessCollector(Variables & Out)
+        : clang::RecursiveASTVisitor<VariableAccessCollector>()
+        , Results(Out)
     { }
 
+    // Variable access is a usage of the variable.
     bool VisitDeclRefExpr(clang::DeclRefExpr const * const DRE) {
         AddToResults(DRE->getDecl());
         return true;
     }
 
+    // Member access is a usage of the class.
     bool VisitMemberExpr(clang::MemberExpr const * const ME) {
         AddToResults(ME->getMemberDecl());
         return true;
     }
 
+    // FIXME: I'm not sure about this...
+    //  Is it good to count declarations as usage?
     bool VisitDeclStmt(clang::DeclStmt const * const DS) {
         clang::DeclGroupRef const & DG = DS->getDeclGroup();
         for (clang::DeclGroupRef::const_iterator It(DG.begin()), End(DG.end()); It != End; ++It) {
@@ -172,16 +188,12 @@ private:
     inline
     void AddToResults(clang::Decl const * const D) {
         if (clang::VarDecl const * const VD = clang::dyn_cast<clang::VarDecl>(D)) {
-            Used.insert(VD);
+            Results.insert(VD);
         }
     }
 
 private:
-    Variables & Used;
-
-private:
-    VariableAccessCollector(VariableAccessCollector const &);
-    VariableAccessCollector operator=(VariableAccessCollector const &);
+    Variables & Results;
 };
 
 } // namespace anonymous
