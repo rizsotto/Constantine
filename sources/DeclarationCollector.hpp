@@ -19,7 +19,7 @@ class DeclarationCollector : public clang::RecursiveASTVisitor<DeclarationCollec
 public:
     DeclarationCollector();
 
-    bool VisitBlockDeck(clang::BlockDecl const *);
+    bool VisitBlockDecl(clang::BlockDecl const *);
     bool VisitFunctionDecl(clang::FunctionDecl const *);
     bool VisitLinkageSpecDecl(clang::LinkageSpecDecl const *);
     bool VisitNamespaceDecl(clang::NamespaceDecl const *);

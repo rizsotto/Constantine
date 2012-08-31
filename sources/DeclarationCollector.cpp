@@ -22,7 +22,7 @@ DeclarationCollector::DeclarationCollector()
 , Ctxs()
 { }
 
-bool DeclarationCollector::VisitBlockDeck(clang::BlockDecl const * const D) {
+bool DeclarationCollector::VisitBlockDecl(clang::BlockDecl const * const D) {
     return collectDeclarations(D, D);
 }
 bool DeclarationCollector::VisitFunctionDecl(clang::FunctionDecl const * const D) {
