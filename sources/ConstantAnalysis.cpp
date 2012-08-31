@@ -29,10 +29,10 @@ clang::Decl const * getDecl(clang::Expr const * const E) {
 
 typedef std::set<clang::VarDecl const *> Variables;
 
-class StatementVisitor : public clang::RecursiveASTVisitor<StatementVisitor> {
+class VariableChangeCollector : public clang::RecursiveASTVisitor<VariableChangeCollector> {
 public:
-    StatementVisitor(Variables & In)
-    : clang::RecursiveASTVisitor<StatementVisitor>()
+    VariableChangeCollector(Variables & In)
+    : clang::RecursiveASTVisitor<VariableChangeCollector>()
     , Changed(In)
     { }
 
@@ -92,9 +92,9 @@ public:
     }
 
     bool VisitDeclStmt(clang::DeclStmt const * const DS) {
-        for (clang::DeclStmt::const_decl_iterator I = DS->decl_begin(),
-             E = DS->decl_end(); I != E; ++I) {
-            checkRefDeclaration(*I);
+        clang::DeclGroupRef const & DG = DS->getDeclGroup();
+        for (clang::DeclGroupRef::const_iterator It(DG.begin()), End(DG.end()); It != End; ++It) {
+            checkRefDeclaration(*It);
         }
         return true;
     }
@@ -117,6 +117,7 @@ public:
     }
 
 private:
+    inline
     void checkRefDeclaration(clang::Decl const * const Decl) {
         if (clang::VarDecl const * const VD = clang::dyn_cast<clang::VarDecl const>(Decl)) {
             if (is_reference(VD) && is_non_const(VD)) {
@@ -125,6 +126,7 @@ private:
         }
     }
 
+    inline
     void insertWhenReferedWithoutCast(clang::Expr const * const E) {
         if (clang::Decl const * const D = getDecl(E)) {
             if (clang::VarDecl const * const VD = clang::dyn_cast<clang::VarDecl>(D)) {
@@ -137,18 +139,63 @@ private:
     Variables & Changed;
 
 private:
-    StatementVisitor(StatementVisitor const &);
-    StatementVisitor & operator=(StatementVisitor const &);
+    VariableChangeCollector(VariableChangeCollector const &);
+    VariableChangeCollector & operator=(VariableChangeCollector const &);
+};
+
+class VariableAccessCollector : public clang::RecursiveASTVisitor<VariableAccessCollector> {
+public:
+    VariableAccessCollector(Variables & In)
+    : clang::RecursiveASTVisitor<VariableAccessCollector>()
+    , Used(In)
+    { }
+
+    bool VisitDeclRefExpr(clang::DeclRefExpr const * const DRE) {
+        AddToResults(DRE->getDecl());
+        return true;
+    }
+
+    bool VisitMemberExpr(clang::MemberExpr const * const ME) {
+        AddToResults(ME->getMemberDecl());
+        return true;
+    }
+
+    bool VisitDeclStmt(clang::DeclStmt const * const DS) {
+        clang::DeclGroupRef const & DG = DS->getDeclGroup();
+        for (clang::DeclGroupRef::const_iterator It(DG.begin()), End(DG.end()); It != End; ++It) {
+            AddToResults(*It);
+        }
+        return true;
+    }
+
+private:
+    inline
+    void AddToResults(clang::Decl const * const D) {
+        if (clang::VarDecl const * const VD = clang::dyn_cast<clang::VarDecl>(D)) {
+            Used.insert(VD);
+        }
+    }
+
+private:
+    Variables & Used;
+
+private:
+    VariableAccessCollector(VariableAccessCollector const &);
+    VariableAccessCollector operator=(VariableAccessCollector const &);
 };
 
 } // namespace anonymous
 
 ConstantAnalysis ConstantAnalysis::AnalyseThis(clang::Stmt const & Stmt) {
     ConstantAnalysis Result;
-
-    StatementVisitor Visitor(Result.Changed);
-    Visitor.TraverseStmt(const_cast<clang::Stmt*>(&Stmt));
-
+    {
+        VariableChangeCollector Visitor(Result.Changed);
+        Visitor.TraverseStmt(const_cast<clang::Stmt*>(&Stmt));
+    }
+    {
+        VariableAccessCollector Visitor(Result.Used);
+        Visitor.TraverseStmt(const_cast<clang::Stmt*>(&Stmt));
+    }
     return Result;
 }
 
