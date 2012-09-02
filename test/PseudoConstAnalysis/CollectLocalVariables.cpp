@@ -7,7 +7,7 @@ int test_method() {
 
 namespace {
     int test_method_in_namespace() {
-        int k = 1; // expected-warning {{variable 'k' could be declared as const [Medve plugin]}}
+        int k = 1; // expected-warning {{variable 'k' could be declared as const}}
         return (k == 9) ? 1 : 2;
     }
 }

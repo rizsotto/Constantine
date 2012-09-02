@@ -100,8 +100,10 @@ public:
         return true;
     }
 
-    // FIXME: These are suppose to be those cases when _new_ variables 
-    // are declared, but not when they were changed. Is it correct?
+    // FIXME: This is the case when a new variable is declared and
+    // the current might be marked as non-const if the new variable
+    // also not const. This should be represented as dependency graph
+    // and not neccessary would mean change on the variable.
     bool VisitDeclStmt(clang::DeclStmt const * const DS) {
         clang::DeclGroupRef const & DG = DS->getDeclGroup();
         for (clang::DeclGroupRef::const_iterator It(DG.begin()), End(DG.end()); It != End; ++It) {
@@ -171,16 +173,6 @@ public:
     // Member access is a usage of the class.
     bool VisitMemberExpr(clang::MemberExpr const * const ME) {
         AddToResults(ME->getMemberDecl());
-        return true;
-    }
-
-    // FIXME: I'm not sure about this...
-    //  Is it good to count declarations as usage?
-    bool VisitDeclStmt(clang::DeclStmt const * const DS) {
-        clang::DeclGroupRef const & DG = DS->getDeclGroup();
-        for (clang::DeclGroupRef::const_iterator It(DG.begin()), End(DG.end()); It != End; ++It) {
-            AddToResults(*It);
-        }
         return true;
     }
 
