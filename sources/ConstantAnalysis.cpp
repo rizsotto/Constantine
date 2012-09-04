@@ -31,15 +31,37 @@ clang::Decl const * getDecl(clang::Expr const * const E) {
     return 0;
 }
 
-typedef std::set<clang::VarDecl const *> Variables;
+
+class VerboseVariableCollector {
+protected:
+    typedef std::set<clang::VarDecl const *> Variables;
+
+public:
+    VerboseVariableCollector(Variables & Out)
+        : Results(Out)
+    { }
+
+protected:
+    inline
+    void AddToResults(clang::Decl const * const D) {
+        if (clang::VarDecl const * const VD = clang::dyn_cast<clang::VarDecl>(D)) {
+            Results.insert(VD);
+        }
+    }
+
+private:
+    Variables & Results;
+};
 
 // Collect all variables which were mutated in the given scope.
 // (The scope is given by the TraverseStmt method.)
-class VariableChangeCollector : public clang::RecursiveASTVisitor<VariableChangeCollector> {
+class VariableChangeCollector
+    : public VerboseVariableCollector
+    , public clang::RecursiveASTVisitor<VariableChangeCollector> {
 public:
-    VariableChangeCollector(Variables & In)
-        : clang::RecursiveASTVisitor<VariableChangeCollector>()
-        , Changed(In)
+    VariableChangeCollector(Variables & Out)
+        : VerboseVariableCollector(Out)
+        , clang::RecursiveASTVisitor<VariableChangeCollector>()
     { }
 
     // Assignments are mutating variables.
@@ -66,9 +88,7 @@ public:
         case clang::BO_XorAssign:
         case clang::BO_ShlAssign:
         case clang::BO_ShrAssign:
-            if (clang::VarDecl const * const VD = clang::dyn_cast<clang::VarDecl>(LHSDecl)) {
-                Changed.insert(VD);
-            }
+            AddToResults(LHSDecl);
             break;
         default:
             break;
@@ -90,9 +110,7 @@ public:
         case clang::UO_PreInc:
         // FIXME: Address-Of ruin the whole pointer business...
         case clang::UO_AddrOf:
-            if (clang::VarDecl const * const VD = clang::dyn_cast<clang::VarDecl>(D)) {
-                Changed.insert(VD);
-            }
+            AddToResults(D);
             break;
         default:
             break;
@@ -145,23 +163,20 @@ private:
     inline
     void insertWhenReferedWithoutCast(clang::Expr const * const E) {
         if (clang::Decl const * const D = getDecl(E)) {
-            if (clang::VarDecl const * const VD = clang::dyn_cast<clang::VarDecl>(D)) {
-                Changed.insert(VD);
-            }
+            AddToResults(D);
         }
     }
-
-private:
-    Variables & Changed;
 };
 
 // Collect all variables which were accessed in the given scope.
 // (The scope is given by the TraverseStmt method.)
-class VariableAccessCollector : public clang::RecursiveASTVisitor<VariableAccessCollector> {
+class VariableAccessCollector
+    : public VerboseVariableCollector
+    , public clang::RecursiveASTVisitor<VariableAccessCollector> {
 public:
     VariableAccessCollector(Variables & Out)
-        : clang::RecursiveASTVisitor<VariableAccessCollector>()
-        , Results(Out)
+        : VerboseVariableCollector(Out)
+        , clang::RecursiveASTVisitor<VariableAccessCollector>()
     { }
 
     // Variable access is a usage of the variable.
@@ -175,17 +190,6 @@ public:
         AddToResults(ME->getMemberDecl());
         return true;
     }
-
-private:
-    inline
-    void AddToResults(clang::Decl const * const D) {
-        if (clang::VarDecl const * const VD = clang::dyn_cast<clang::VarDecl>(D)) {
-            Results.insert(VD);
-        }
-    }
-
-private:
-    Variables & Results;
 };
 
 } // namespace anonymous
