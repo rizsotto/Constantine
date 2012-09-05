@@ -6,6 +6,8 @@
 #include <functional>
 #include <iterator>
 
+#include <boost/bind.hpp>
+
 #include <clang/AST/RecursiveASTVisitor.h>
 
 namespace {
@@ -22,35 +24,38 @@ bool is_reference(clang::VarDecl const * const D) {
 // it is variable access or member access. Don't we have a better
 // name for it? And shall it be that specific, although the name
 // is so generic?
-clang::Decl const * getDecl(clang::Expr const * const E) {
-    if (clang::DeclRefExpr const * const DR = clang::dyn_cast<clang::DeclRefExpr const>(E)) {
+clang::Decl const * getDecl(clang::Expr const * const Stmt) {
+    if (clang::DeclRefExpr const * const DR = clang::dyn_cast<clang::DeclRefExpr const>(Stmt)) {
         return DR->getDecl();
-    } else if (clang::MemberExpr const * const ME = clang::dyn_cast<clang::MemberExpr>(E)) {
+    } else if (clang::MemberExpr const * const ME = clang::dyn_cast<clang::MemberExpr const>(Stmt)) {
         return getDecl(ME->getBase());
     }
     return 0;
 }
 
-
+// Collect named variables and do emit diagnostic messages for tests.
 class VerboseVariableCollector {
-protected:
-    typedef std::set<clang::VarDecl const *> Variables;
-
 public:
-    VerboseVariableCollector(Variables & Out)
+    VerboseVariableCollector(ConstantAnalysis::Variables & Out)
         : Results(Out)
     { }
 
 protected:
-    inline
-    void AddToResults(clang::Decl const * const D) {
-        if (clang::VarDecl const * const VD = clang::dyn_cast<clang::VarDecl>(D)) {
-            Results.insert(VD);
+    void AddToResults(clang::Decl const * const D, clang::SourceRange const & Location) {
+        if (clang::VarDecl const * const VD = clang::dyn_cast<clang::VarDecl const>(D)) {
+            ConstantAnalysis::Variables::iterator It = Results.find(VD);
+            if (Results.end() == It) {
+                std::pair<ConstantAnalysis::Variables::iterator, bool> R =
+                    Results.insert(ConstantAnalysis::Variables::value_type(VD, ConstantAnalysis::Locations()));
+                It = R.first;
+            }
+            ConstantAnalysis::Locations & Ls = It->second;
+            Ls.push_back(Location);
         }
     }
 
 private:
-    Variables & Results;
+    ConstantAnalysis::Variables & Results;
 };
 
 // Collect all variables which were mutated in the given scope.
@@ -59,22 +64,22 @@ class VariableChangeCollector
     : public VerboseVariableCollector
     , public clang::RecursiveASTVisitor<VariableChangeCollector> {
 public:
-    VariableChangeCollector(Variables & Out)
+    VariableChangeCollector(ConstantAnalysis::Variables & Out)
         : VerboseVariableCollector(Out)
         , clang::RecursiveASTVisitor<VariableChangeCollector>()
     { }
 
     // Assignments are mutating variables.
-    bool VisitBinaryOperator(clang::BinaryOperator const * const BO) {
+    bool VisitBinaryOperator(clang::BinaryOperator const * const Stmt) {
         clang::Decl const * const LHSDecl =
-            getDecl(BO->getLHS()->IgnoreParenCasts());
+            getDecl(Stmt->getLHS()->IgnoreParenCasts());
         if (!LHSDecl)
             return true;
 
-        switch (BO->getOpcode()) {
+        switch (Stmt->getOpcode()) {
         case clang::BO_Assign: {
             clang::Decl const * const RHSDecl =
-                getDecl(BO->getRHS()->IgnoreParenCasts());
+                getDecl(Stmt->getRHS()->IgnoreParenCasts());
             if (LHSDecl == RHSDecl) {
                 break;
             }
@@ -88,7 +93,7 @@ public:
         case clang::BO_XorAssign:
         case clang::BO_ShlAssign:
         case clang::BO_ShrAssign:
-            AddToResults(LHSDecl);
+            AddToResults(LHSDecl, Stmt->getSourceRange());
             break;
         default:
             break;
@@ -97,20 +102,20 @@ public:
     }
 
     // Some operator does mutate variables.
-    bool VisitUnaryOperator(clang::UnaryOperator const * const UO) {
+    bool VisitUnaryOperator(clang::UnaryOperator const * const Stmt) {
         clang::Decl const * const D =
-            getDecl(UO->getSubExpr()->IgnoreParenCasts());
+            getDecl(Stmt->getSubExpr()->IgnoreParenCasts());
         if (!D)
             return true;
 
-        switch (UO->getOpcode()) {
+        switch (Stmt->getOpcode()) {
         case clang::UO_PostDec:
         case clang::UO_PostInc:
         case clang::UO_PreDec:
         case clang::UO_PreInc:
         // FIXME: Address-Of ruin the whole pointer business...
         case clang::UO_AddrOf:
-            AddToResults(D);
+            AddToResults(D, Stmt->getSourceRange());
             break;
         default:
             break;
@@ -122,8 +127,8 @@ public:
     // the current might be marked as non-const if the new variable
     // also not const. This should be represented as dependency graph
     // and not neccessary would mean change on the variable.
-    bool VisitDeclStmt(clang::DeclStmt const * const DS) {
-        clang::DeclGroupRef const & DG = DS->getDeclGroup();
+    bool VisitDeclStmt(clang::DeclStmt const * const Stmt) {
+        clang::DeclGroupRef const & DG = Stmt->getDeclGroup();
         for (clang::DeclGroupRef::const_iterator It(DG.begin()), End(DG.end()); It != End; ++It) {
             checkRefDeclaration(*It);
         }
@@ -131,19 +136,19 @@ public:
     }
 
     // Variables potentially mutated when you pass by-pointer or by-reference.
-    bool VisitCallExpr(clang::CallExpr const * const CE) {
-        for (clang::CallExpr::const_arg_iterator AIt(CE->arg_begin()), AEnd(CE->arg_end()); AIt != AEnd; ++AIt ) {
+    bool VisitCallExpr(clang::CallExpr const * const Stmt) {
+        for (clang::CallExpr::const_arg_iterator AIt(Stmt->arg_begin()), AEnd(Stmt->arg_end()); AIt != AEnd; ++AIt ) {
             insertWhenReferedWithoutCast(*AIt);
         }
         return true;
     }
 
     // Variables are mutated if non-const member function called.
-    bool VisitMemberExpr(clang::MemberExpr const * const CE) {
-        clang::Type const * const T = CE->getMemberDecl()->getType().getCanonicalType().getTypePtr();
+    bool VisitMemberExpr(clang::MemberExpr const * const Stmt) {
+        clang::Type const * const T = Stmt->getMemberDecl()->getType().getCanonicalType().getTypePtr();
         if (clang::FunctionProtoType const * const F = T->getAs<clang::FunctionProtoType>()) {
             if (! (F->getTypeQuals() & clang::Qualifiers::Const) ) {
-                insertWhenReferedWithoutCast(CE);
+                insertWhenReferedWithoutCast(Stmt);
             }
         }
         return true;
@@ -161,9 +166,9 @@ private:
 
     // FIXME: explain it with clang AST examples.
     inline
-    void insertWhenReferedWithoutCast(clang::Expr const * const E) {
-        if (clang::Decl const * const D = getDecl(E)) {
-            AddToResults(D);
+    void insertWhenReferedWithoutCast(clang::Expr const * const Stmt) {
+        if (clang::Decl const * const D = getDecl(Stmt)) {
+            AddToResults(D, Stmt->getSourceRange());
         }
     }
 };
@@ -174,23 +179,45 @@ class VariableAccessCollector
     : public VerboseVariableCollector
     , public clang::RecursiveASTVisitor<VariableAccessCollector> {
 public:
-    VariableAccessCollector(Variables & Out)
+    VariableAccessCollector(ConstantAnalysis::Variables & Out)
         : VerboseVariableCollector(Out)
         , clang::RecursiveASTVisitor<VariableAccessCollector>()
     { }
 
     // Variable access is a usage of the variable.
-    bool VisitDeclRefExpr(clang::DeclRefExpr const * const DRE) {
-        AddToResults(DRE->getDecl());
+    bool VisitDeclRefExpr(clang::DeclRefExpr const * const Stmt) {
+        AddToResults(Stmt->getDecl(), Stmt->getSourceRange());
         return true;
     }
 
     // Member access is a usage of the class.
-    bool VisitMemberExpr(clang::MemberExpr const * const ME) {
-        AddToResults(ME->getMemberDecl());
+    bool VisitMemberExpr(clang::MemberExpr const * const Stmt) {
+        AddToResults(Stmt->getMemberDecl(), Stmt->getSourceRange());
         return true;
     }
 };
+
+std::string CreateMessage(clang::VarDecl const * const D, char const * const Msg) {
+    std::string Result;
+    Result += "variable '";
+    Result += D->getNameAsString();
+    Result += "' ";
+    Result += Msg;
+    return Result;
+}
+
+void ReportEach(clang::DiagnosticsEngine & Diagnostic, clang::SourceRange const & Location, std::string const & Message) {
+    unsigned const Id = Diagnostic.getCustomDiagID(clang::DiagnosticsEngine::Note, Message);
+    clang::DiagnosticBuilder Reporter = Diagnostic.Report(Id);
+    Reporter.AddSourceRange(clang::CharSourceRange::getTokenRange(Location));
+}
+
+void Report(ConstantAnalysis::Variables::value_type const & It, clang::DiagnosticsEngine & Diagnostic, char const * const Msg) {
+    std::string const & Message = CreateMessage(It.first, Msg);
+    ConstantAnalysis::Locations const & Ls = It.second;
+
+    std::for_each(Ls.begin(), Ls.end(), boost::bind(ReportEach, boost::ref(Diagnostic), _1, boost::cref(Message)));
+}
 
 } // namespace anonymous
 
@@ -215,3 +242,9 @@ bool ConstantAnalysis::WasReferenced(clang::VarDecl const * const Decl) const {
     return (Used.end() != Used.find(Decl));
 }
 
+void ConstantAnalysis::Debug(clang::DiagnosticsEngine & DiagEng) const {
+    std::for_each(Changed.begin(), Changed.end(),
+        boost::bind(Report, _1, boost::ref(DiagEng), "was changed"));
+    std::for_each(Used.begin(), Used.end(),
+        boost::bind(Report, _1, boost::ref(DiagEng), "was used"));
+}
