@@ -10,12 +10,13 @@
 
 class VariableChecker : public clang::ASTConsumer {
 public:
-    VariableChecker(clang::CompilerInstance const &);
+    VariableChecker(clang::CompilerInstance const &, bool);
 
     void HandleTranslationUnit(clang::ASTContext &);
 
 private:
     clang::DiagnosticsEngine & DiagEng;
+    bool const VerboseAnalysis;
 
 private:
     VariableChecker(VariableChecker const &);

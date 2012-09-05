@@ -207,8 +207,9 @@ std::string CreateMessage(clang::VarDecl const * const D, char const * const Msg
 }
 
 void ReportEach(clang::DiagnosticsEngine & Diagnostic, clang::SourceRange const & Location, std::string const & Message) {
-    unsigned const Id = Diagnostic.getCustomDiagID(clang::DiagnosticsEngine::Note, Message);
-    clang::DiagnosticBuilder Reporter = Diagnostic.Report(Id);
+    // FIXME: set level to Note. Currently only Warning and above are printed on the cosole.
+    unsigned const Id = Diagnostic.getCustomDiagID(clang::DiagnosticsEngine::Warning, Message);
+    clang::DiagnosticBuilder Reporter = Diagnostic.Report(Location.getBegin(), Id);
     Reporter.AddSourceRange(clang::CharSourceRange::getTokenRange(Location));
 }
 
