@@ -29,13 +29,37 @@ void report(clang::DiagnosticsEngine & DiagEng, clang::VarDecl const * const Dec
 
 class FunctionVisitor : public clang::RecursiveASTVisitor<FunctionVisitor> {
 public:
-    FunctionVisitor(Variables & In, clang::DiagnosticsEngine * const Diagnostics)
+    FunctionVisitor(clang::DiagnosticsEngine & Diagnostics, bool const InDebugChanges, bool const InDebugUsages)
         : clang::RecursiveASTVisitor<FunctionVisitor>()
-        , Candidates(In)
+        , Candidates()
         , Changed()
         , Reporter(Diagnostics)
+        , DebugChanges(InDebugChanges)
+        , DebugUsages(InDebugUsages)
     {}
 
+    bool VisitFunctionDecl(clang::FunctionDecl const * F) {
+        ConstantAnalysis const & Analysis = ConstantAnalysis::AnalyseThis(*(F->getBody()));
+        if (DebugChanges) {
+            Analysis.DebugChanged(Reporter);
+        }
+        if (DebugUsages) {
+            Analysis.DebugReferenced(Reporter);
+        }
+        for (clang::DeclContext::decl_iterator It(F->decls_begin()), End(F->decls_end()); It != End; ++It) {
+            if (clang::VarDecl const * const VD = clang::dyn_cast<clang::VarDecl>(*It)) {
+                Decide(*VD, ! Analysis.WasChanged(VD));
+            }
+        }
+        return true;
+    }
+
+    void GenerateReports() {
+        std::for_each(Candidates.begin(), Candidates.end(),
+            std::bind1st(std::ptr_fun(report), Reporter));
+    }
+
+private:
     static bool IsConst(clang::VarDecl const & D) {
         return (D.getType().getNonReferenceType().isConstQualified());
     }
@@ -53,43 +77,31 @@ public:
         }
     }
 
-    bool VisitFunctionDecl(clang::FunctionDecl const * F) {
-        ConstantAnalysis const & Analysis = ConstantAnalysis::AnalyseThis(*(F->getBody()));
-        if (Reporter) {
-            Analysis.Debug(*Reporter);
-        }
-        for (clang::DeclContext::decl_iterator It(F->decls_begin()), End(F->decls_end()); It != End; ++It) {
-            if (clang::VarDecl const * const VD = clang::dyn_cast<clang::VarDecl>(*It)) {
-                Decide(*VD, ! Analysis.WasChanged(VD));
-            }
-        }
-        return true;
-    }
-
-    Variables const & GetResult() const {
-        return Candidates;
-    }
-
 private:
-    Variables & Candidates;
+    Variables Candidates;
 
     Variables Changed;
-    clang::DiagnosticsEngine * const Reporter;
+    clang::DiagnosticsEngine & Reporter;
+
+    bool const DebugChanges;
+    bool const DebugUsages;
 };
 
 } // namespace anonymous
 
 
-VariableChecker::VariableChecker(clang::CompilerInstance const & Compiler, bool const Verbose)
+VariableChecker::VariableChecker(clang::CompilerInstance const & Compiler, bool const InDebugChanges, bool const InDebugUsages)
     : clang::ASTConsumer()
-    , DiagEng(Compiler.getDiagnostics())
-    , VerboseAnalysis(Verbose)
+    , Reporter(Compiler.getDiagnostics())
+    , DebugChanges(InDebugChanges)
+    , DebugUsages(InDebugUsages)
 { }
 
 void VariableChecker::HandleTranslationUnit(clang::ASTContext & Ctx) {
-    Variables Result;
-    FunctionVisitor Collector(Result, (VerboseAnalysis ? &DiagEng : 0));
+    FunctionVisitor Collector(Reporter, DebugChanges, DebugUsages);
     Collector.TraverseDecl(Ctx.getTranslationUnitDecl());
-    // Print out the results
-    std::for_each(Result.begin(), Result.end(), std::bind1st(std::ptr_fun(report), DiagEng));
+    // generate reports only if we don't debug anything
+    if ((! DebugChanges) && (! DebugUsages)) {
+        Collector.GenerateReports();
+    }
 }

@@ -216,8 +216,8 @@ void ReportEach(clang::DiagnosticsEngine & Diagnostic, clang::SourceRange const 
 void Report(ConstantAnalysis::Variables::value_type const & It, clang::DiagnosticsEngine & Diagnostic, char const * const Msg) {
     std::string const & Message = CreateMessage(It.first, Msg);
     ConstantAnalysis::Locations const & Ls = It.second;
-
-    std::for_each(Ls.begin(), Ls.end(), boost::bind(ReportEach, boost::ref(Diagnostic), _1, boost::cref(Message)));
+    std::for_each(Ls.begin(), Ls.end(),
+        boost::bind(ReportEach, boost::ref(Diagnostic), _1, boost::cref(Message)));
 }
 
 } // namespace anonymous
@@ -243,9 +243,12 @@ bool ConstantAnalysis::WasReferenced(clang::VarDecl const * const Decl) const {
     return (Used.end() != Used.find(Decl));
 }
 
-void ConstantAnalysis::Debug(clang::DiagnosticsEngine & DiagEng) const {
+void ConstantAnalysis::DebugChanged(clang::DiagnosticsEngine & DiagEng) const {
     std::for_each(Changed.begin(), Changed.end(),
         boost::bind(Report, _1, boost::ref(DiagEng), "was changed"));
+}
+
+void ConstantAnalysis::DebugReferenced(clang::DiagnosticsEngine & DiagEng) const {
     std::for_each(Used.begin(), Used.end(),
         boost::bind(Report, _1, boost::ref(DiagEng), "was used"));
 }

@@ -29,8 +29,11 @@ class Plugin : public clang::PluginASTAction {
 public:
     Plugin()
         : clang::PluginASTAction()
-        , FlagDebugDetection("debug-detection",
-            llvm::cl::desc("Enable debug output [Medve plugin]"),
+        , FlagDebugChangeDetection("debug-change-detection",
+            llvm::cl::desc("Enable debug output for variable changes [Medve plugin]"),
+            llvm::cl::init(false))
+        , FlagDebugUsageDetection("debug-usage-detection",
+            llvm::cl::desc("Enable debug output for variable usages [Medve plugin]"),
             llvm::cl::init(false))
     { }
 
@@ -42,7 +45,7 @@ private:
 
     clang::ASTConsumer * CreateASTConsumer(clang::CompilerInstance & Compiler, llvm::StringRef) {
         return IsCPlusPlus(Compiler)
-            ? (clang::ASTConsumer *) new VariableChecker(Compiler, FlagDebugDetection)
+            ? (clang::ASTConsumer *) new VariableChecker(Compiler, FlagDebugChangeDetection, FlagDebugUsageDetection)
             : (clang::ASTConsumer *) new NullConsumer();
     }
 
@@ -65,7 +68,8 @@ private:
     }
 
 private:
-    llvm::cl::opt<bool> FlagDebugDetection;
+    llvm::cl::opt<bool> FlagDebugChangeDetection;
+    llvm::cl::opt<bool> FlagDebugUsageDetection;
 };
 
 } // namespace anonymous

@@ -23,7 +23,8 @@ public:
     bool WasChanged(clang::VarDecl const *) const;
     bool WasReferenced(clang::VarDecl const *) const;
 
-    void Debug(clang::DiagnosticsEngine &) const;
+    void DebugChanged(clang::DiagnosticsEngine &) const;
+    void DebugReferenced(clang::DiagnosticsEngine &) const;
 
 private:
     Variables Changed;
