@@ -197,27 +197,24 @@ public:
     }
 };
 
-std::string CreateMessage(clang::VarDecl const * const D, char const * const Msg) {
-    std::string Result;
-    Result += "variable '";
-    Result += D->getNameAsString();
-    Result += "' ";
-    Result += Msg;
-    return Result;
+inline
+void Report(ConstantAnalysis::Variables::value_type const & Var, unsigned const Id, clang::DiagnosticsEngine & DE) {
+    ConstantAnalysis::Locations const & Ls = Var.second;
+    for (ConstantAnalysis::Locations::const_iterator It(Ls.begin()), End(Ls.end()); It != End; ++It) {
+        clang::DiagnosticBuilder DB = DE.Report(It->getBegin(), Id);
+        DB << Var.first->getNameAsString();
+        DB.AddSourceRange(clang::CharSourceRange::getTokenRange(*It));
+    }
 }
 
-void ReportEach(clang::DiagnosticsEngine & Diagnostic, clang::SourceRange const & Location, std::string const & Message) {
-    // FIXME: set level to Note. Currently only Warning and above are printed on the cosole.
-    unsigned const Id = Diagnostic.getCustomDiagID(clang::DiagnosticsEngine::Warning, Message);
-    clang::DiagnosticBuilder Reporter = Diagnostic.Report(Location.getBegin(), Id);
-    Reporter.AddSourceRange(clang::CharSourceRange::getTokenRange(Location));
+void ReportChanges(ConstantAnalysis::Variables::value_type const & Var, clang::DiagnosticsEngine & DE) {
+    unsigned const Id = DE.getCustomDiagID(clang::DiagnosticsEngine::Note, "variable '%0' was changed");
+    return Report(Var, Id, DE);
 }
 
-void Report(ConstantAnalysis::Variables::value_type const & It, clang::DiagnosticsEngine & Diagnostic, char const * const Msg) {
-    std::string const & Message = CreateMessage(It.first, Msg);
-    ConstantAnalysis::Locations const & Ls = It.second;
-    std::for_each(Ls.begin(), Ls.end(),
-        boost::bind(ReportEach, boost::ref(Diagnostic), _1, boost::cref(Message)));
+void ReportUsages(ConstantAnalysis::Variables::value_type const & Var, clang::DiagnosticsEngine & DE) {
+    unsigned const Id = DE.getCustomDiagID(clang::DiagnosticsEngine::Note, "variable '%0' was used");
+    return Report(Var, Id, DE);
 }
 
 } // namespace anonymous
@@ -243,12 +240,12 @@ bool ConstantAnalysis::WasReferenced(clang::VarDecl const * const Decl) const {
     return (Used.end() != Used.find(Decl));
 }
 
-void ConstantAnalysis::DebugChanged(clang::DiagnosticsEngine & DiagEng) const {
+void ConstantAnalysis::DebugChanged(clang::DiagnosticsEngine & DE) const {
     std::for_each(Changed.begin(), Changed.end(),
-        boost::bind(Report, _1, boost::ref(DiagEng), "was changed"));
+        boost::bind(ReportChanges, _1, boost::ref(DE)));
 }
 
-void ConstantAnalysis::DebugReferenced(clang::DiagnosticsEngine & DiagEng) const {
+void ConstantAnalysis::DebugReferenced(clang::DiagnosticsEngine & DE) const {
     std::for_each(Used.begin(), Used.end(),
-        boost::bind(Report, _1, boost::ref(DiagEng), "was used"));
+        boost::bind(ReportUsages, _1, boost::ref(DE)));
 }

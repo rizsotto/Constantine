@@ -17,13 +17,11 @@ namespace {
 typedef std::set<clang::VarDecl const *> Variables;
 
 void report(clang::DiagnosticsEngine & DiagEng, clang::VarDecl const * const Decl) {
-    std::string Msg;
-    Msg += "variable '";
-    Msg += Decl->getNameAsString();
-    Msg += "' could be declared as const [Medve plugin]";
+    char const * const Message = "variable '%0' could be declared as const [Medve plugin]";
 
-    unsigned const DiagID = DiagEng.getCustomDiagID(clang::DiagnosticsEngine::Warning, Msg.c_str());
-    DiagEng.Report(Decl->getLocStart(), DiagID);
+    unsigned const DiagID = DiagEng.getCustomDiagID(clang::DiagnosticsEngine::Warning, Message);
+    clang::DiagnosticBuilder Reporter = DiagEng.Report(Decl->getLocStart(), DiagID);
+    Reporter << Decl->getNameAsString();
 }
 
 
