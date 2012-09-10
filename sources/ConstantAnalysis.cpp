@@ -84,15 +84,16 @@ public:
                 break;
             }
         }
-        case clang::BO_AddAssign:
-        case clang::BO_SubAssign:
         case clang::BO_MulAssign:
         case clang::BO_DivAssign:
-        case clang::BO_AndAssign:
-        case clang::BO_OrAssign:
-        case clang::BO_XorAssign:
+        case clang::BO_RemAssign:
+        case clang::BO_AddAssign:
+        case clang::BO_SubAssign:
         case clang::BO_ShlAssign:
         case clang::BO_ShrAssign:
+        case clang::BO_AndAssign:
+        case clang::BO_XorAssign:
+        case clang::BO_OrAssign:
             AddToResults(LHSDecl, Stmt->getSourceRange());
             break;
         default:
@@ -109,10 +110,10 @@ public:
             return true;
 
         switch (Stmt->getOpcode()) {
-        case clang::UO_PostDec:
         case clang::UO_PostInc:
-        case clang::UO_PreDec:
+        case clang::UO_PostDec:
         case clang::UO_PreInc:
+        case clang::UO_PreDec:
         // FIXME: Address-Of ruin the whole pointer business...
         case clang::UO_AddrOf:
             AddToResults(D, Stmt->getSourceRange());
