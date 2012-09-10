@@ -12,27 +12,6 @@
 
 namespace {
 
-bool is_non_const(clang::VarDecl const * const D) {
-    return (! (D->getType().getNonReferenceType().isConstQualified()));
-}
-
-bool is_reference(clang::VarDecl const * const D) {
-    return (D->getType().getTypePtr()->isReferenceType());
-}
-
-// FIXME: extract clang::Decl from an clang::Expr, but only if
-// it is variable access or member access. Don't we have a better
-// name for it? And shall it be that specific, although the name
-// is so generic?
-clang::Decl const * getDecl(clang::Expr const * const Stmt) {
-    if (clang::DeclRefExpr const * const DR = clang::dyn_cast<clang::DeclRefExpr const>(Stmt)) {
-        return DR->getDecl();
-    } else if (clang::MemberExpr const * const ME = clang::dyn_cast<clang::MemberExpr const>(Stmt)) {
-        return getDecl(ME->getBase());
-    }
-    return 0;
-}
-
 // Collect named variables and do emit diagnostic messages for tests.
 class VerboseVariableCollector {
 public:
@@ -72,14 +51,14 @@ public:
     // Assignments are mutating variables.
     bool VisitBinaryOperator(clang::BinaryOperator const * const Stmt) {
         clang::Decl const * const LHSDecl =
-            getDecl(Stmt->getLHS()->IgnoreParenCasts());
+            GetDeclaration(Stmt->getLHS()->IgnoreParenCasts());
         if (!LHSDecl)
             return true;
 
         switch (Stmt->getOpcode()) {
         case clang::BO_Assign: {
             clang::Decl const * const RHSDecl =
-                getDecl(Stmt->getRHS()->IgnoreParenCasts());
+                GetDeclaration(Stmt->getRHS()->IgnoreParenCasts());
             if (LHSDecl == RHSDecl) {
                 break;
             }
@@ -105,7 +84,7 @@ public:
     // Some operator does mutate variables.
     bool VisitUnaryOperator(clang::UnaryOperator const * const Stmt) {
         clang::Decl const * const D =
-            getDecl(Stmt->getSubExpr()->IgnoreParenCasts());
+            GetDeclaration(Stmt->getSubExpr()->IgnoreParenCasts());
         if (!D)
             return true;
 
@@ -114,8 +93,6 @@ public:
         case clang::UO_PostDec:
         case clang::UO_PreInc:
         case clang::UO_PreDec:
-        // FIXME: Address-Of ruin the whole pointer business...
-        case clang::UO_AddrOf:
             AddToResults(D, Stmt->getSourceRange());
             break;
         default:
@@ -124,23 +101,10 @@ public:
         return true;
     }
 
-    // FIXME: This is the case when a new variable is declared and
-    // the current might be marked as non-const if the new variable
-    // also not const. This should be represented as dependency graph
-    // and not neccessary would mean change on the variable.
-    bool VisitDeclStmt(clang::DeclStmt const * const Stmt) {
-        clang::DeclGroupRef const & DG = Stmt->getDeclGroup();
-        for (clang::DeclGroupRef::const_iterator It(DG.begin()), End(DG.end()); It != End; ++It) {
-            checkRefDeclaration(*It);
-        }
-        return true;
-    }
-
     // Variables potentially mutated when you pass by-pointer or by-reference.
     bool VisitCallExpr(clang::CallExpr const * const Stmt) {
-        for (clang::CallExpr::const_arg_iterator AIt(Stmt->arg_begin()), AEnd(Stmt->arg_end()); AIt != AEnd; ++AIt ) {
-            insertWhenReferedWithoutCast(*AIt);
-        }
+        std::for_each(Stmt->arg_begin(), Stmt->arg_end(),
+            boost::bind(&VariableChangeCollector::AddToResultsWhenReferedWithoutCast, boost::ref(this), _1));
         return true;
     }
 
@@ -149,28 +113,90 @@ public:
         clang::Type const * const T = Stmt->getMemberDecl()->getType().getCanonicalType().getTypePtr();
         if (clang::FunctionProtoType const * const F = T->getAs<clang::FunctionProtoType>()) {
             if (! (F->getTypeQuals() & clang::Qualifiers::Const) ) {
-                insertWhenReferedWithoutCast(Stmt);
+                AddToResultsWhenReferedWithoutCast(Stmt);
             }
         }
         return true;
     }
 
 private:
+    /*** source looks like this ***
+
+        void by_pointer(int *) { }
+
+        void by_const_pointer(int const *) { }
+
+        void by_ref(int &) { }
+
+        void by_const_ref(int const &) { }
+
+        void by_value(int) { }
+
+        void test() {
+            int k = 0;
+            int * kptr = &k;
+
+            by_pointer(kptr);
+            by_const_pointer(kptr);
+            by_ref(k);
+            by_const_ref(k);
+            by_value(k);
+        }
+
+        *** AST looks like this ***
+
+        void test() (CompoundStmt 0x40d3c48 <./show.cpp:12:13, line:21:1>
+          (DeclStmt 0x40d3558 <line:13:5, col:14>
+            0x40d34e0 "int k =
+              (IntegerLiteral 0x40d3538 <col:13> 'int' 0)")
+          (DeclStmt 0x40d3630 <line:14:5, col:20>
+            0x40d3590 "int *kptr =
+              (UnaryOperator 0x40d3610 <col:18, col:19> 'int *' prefix '&'
+                (DeclRefExpr 0x40d35e8 <col:19> 'int' lvalue Var 0x40d34e0 'k' 'int'))")
+          (CallExpr 0x40d3730 <line:16:5, col:20> 'void'
+            (ImplicitCastExpr 0x40d3718 <col:5> 'void (*)(int *)' <FunctionToPointerDecay>
+              (DeclRefExpr 0x40d36c8 <col:5> 'void (int *)' lvalue Function 0x40a6ca0 'by_pointer' 'void (int *)'))
+            (ImplicitCastExpr 0x40d3760 <col:16> 'int *' <LValueToRValue>
+              (DeclRefExpr 0x40d36a0 <col:16> 'int *' lvalue Var 0x40d3590 'kptr' 'int *')))
+          (CallExpr 0x40d3860 <line:17:5, col:26> 'void'
+            (ImplicitCastExpr 0x40d3848 <col:5> 'void (*)(const int *)' <FunctionToPointerDecay>
+              (DeclRefExpr 0x40d37f8 <col:5> 'void (const int *)' lvalue Function 0x40d2e10 'by_const_pointer' 'void (const int *)'))
+            (ImplicitCastExpr 0x40d38a8 <col:22> 'const int *' <NoOp>
+              (ImplicitCastExpr 0x40d3890 <col:22> 'int *' <LValueToRValue>
+                (DeclRefExpr 0x40d37d0 <col:22> 'int *' lvalue Var 0x40d3590 'kptr' 'int *'))))
+          (CallExpr 0x40d39b0 <line:18:5, col:13> 'void'
+            (ImplicitCastExpr 0x40d3998 <col:5> 'void (*)(int &)' <FunctionToPointerDecay>
+              (DeclRefExpr 0x40d3940 <col:5> 'void (int &)' lvalue Function 0x40d2fd0 'by_ref' 'void (int &)'))
+            (DeclRefExpr 0x40d3918 <col:12> 'int' lvalue Var 0x40d34e0 'k' 'int'))
+          (CallExpr 0x40d3ad0 <line:19:5, col:19> 'void'
+            (ImplicitCastExpr 0x40d3ab8 <col:5> 'void (*)(const int &)' <FunctionToPointerDecay>
+              (DeclRefExpr 0x40d3a60 <col:5> 'void (const int &)' lvalue Function 0x40d3190 'by_const_ref' 'void (const int &)'))
+            (ImplicitCastExpr 0x40d3b00 <col:18> 'const int' lvalue <NoOp>
+              (DeclRefExpr 0x40d3a38 <col:18> 'int' lvalue Var 0x40d34e0 'k' 'int')))
+          (CallExpr 0x40d3c00 <line:20:5, col:15> 'void'
+            (ImplicitCastExpr 0x40d3be8 <col:5> 'void (*)(int)' <FunctionToPointerDecay>
+              (DeclRefExpr 0x40d3b98 <col:5> 'void (int)' lvalue Function 0x40d3320 'by_value' 'void (int)'))
+            (ImplicitCastExpr 0x40d3c30 <col:14> 'int' <LValueToRValue>
+              (DeclRefExpr 0x40d3b70 <col:14> 'int' lvalue Var 0x40d34e0 'k' 'int'))))
+     */
     inline
-    void checkRefDeclaration(clang::Decl const * const Decl) {
-        if (clang::VarDecl const * const VD = clang::dyn_cast<clang::VarDecl const>(Decl)) {
-            if (is_reference(VD) && is_non_const(VD)) {
-                insertWhenReferedWithoutCast(VD->getInit()->IgnoreParenCasts());
-            }
+    void AddToResultsWhenReferedWithoutCast(clang::Expr const * const Stmt) {
+        if (clang::Decl const * const D = GetDeclaration(Stmt)) {
+            AddToResults(D, Stmt->getSourceRange());
         }
     }
 
-    // FIXME: explain it with clang AST examples.
-    inline
-    void insertWhenReferedWithoutCast(clang::Expr const * const Stmt) {
-        if (clang::Decl const * const D = getDecl(Stmt)) {
-            AddToResults(D, Stmt->getSourceRange());
+    // FIXME: extract clang::Decl from an clang::Expr, but only if
+    // it is variable access or member access. Don't we have a better
+    // name for it? And shall it be that specific, although the name
+    // is so generic?
+    static clang::Decl const * GetDeclaration(clang::Expr const * const Stmt) {
+        if (clang::DeclRefExpr const * const DR = clang::dyn_cast<clang::DeclRefExpr const>(Stmt)) {
+            return DR->getDecl();
+        } else if (clang::MemberExpr const * const ME = clang::dyn_cast<clang::MemberExpr const>(Stmt)) {
+            return GetDeclaration(ME->getBase());
         }
+        return 0;
     }
 };
 
@@ -198,8 +224,10 @@ public:
     }
 };
 
-inline
-void Report(ConstantAnalysis::Variables::value_type const & Var, unsigned const Id, clang::DiagnosticsEngine & DE) {
+void Report( ConstantAnalysis::Variables::value_type const & Var
+           , char const * const Message
+           , clang::DiagnosticsEngine & DE) {
+    unsigned const Id = DE.getCustomDiagID(clang::DiagnosticsEngine::Note, Message);
     ConstantAnalysis::Locations const & Ls = Var.second;
     for (ConstantAnalysis::Locations::const_iterator It(Ls.begin()), End(Ls.end()); It != End; ++It) {
         clang::DiagnosticBuilder DB = DE.Report(It->getBegin(), Id);
@@ -207,16 +235,6 @@ void Report(ConstantAnalysis::Variables::value_type const & Var, unsigned const 
         DB.AddSourceRange(clang::CharSourceRange::getTokenRange(*It));
         DB.setForceEmit();
     }
-}
-
-void ReportChanges(ConstantAnalysis::Variables::value_type const & Var, clang::DiagnosticsEngine & DE) {
-    unsigned const Id = DE.getCustomDiagID(clang::DiagnosticsEngine::Note, "variable '%0' was changed");
-    return Report(Var, Id, DE);
-}
-
-void ReportUsages(ConstantAnalysis::Variables::value_type const & Var, clang::DiagnosticsEngine & DE) {
-    unsigned const Id = DE.getCustomDiagID(clang::DiagnosticsEngine::Note, "variable '%0' was used");
-    return Report(Var, Id, DE);
 }
 
 } // namespace anonymous
@@ -244,10 +262,10 @@ bool ConstantAnalysis::WasReferenced(clang::VarDecl const * const Decl) const {
 
 void ConstantAnalysis::DebugChanged(clang::DiagnosticsEngine & DE) const {
     std::for_each(Changed.begin(), Changed.end(),
-        boost::bind(ReportChanges, _1, boost::ref(DE)));
+        boost::bind(Report, _1, "variable '%0' was changed", boost::ref(DE)));
 }
 
 void ConstantAnalysis::DebugReferenced(clang::DiagnosticsEngine & DE) const {
     std::for_each(Used.begin(), Used.end(),
-        boost::bind(ReportUsages, _1, boost::ref(DE)));
+        boost::bind(Report, _1, "variable '%0' was used", boost::ref(DE)));
 }
