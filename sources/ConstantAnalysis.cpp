@@ -204,6 +204,7 @@ void Report(ConstantAnalysis::Variables::value_type const & Var, unsigned const 
         clang::DiagnosticBuilder DB = DE.Report(It->getBegin(), Id);
         DB << Var.first->getNameAsString();
         DB.AddSourceRange(clang::CharSourceRange::getTokenRange(*It));
+        DB.setForceEmit();
     }
 }
 
