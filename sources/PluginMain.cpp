@@ -12,7 +12,6 @@
 
 #include <boost/functional.hpp>
 #include <boost/range/algorithm/transform.hpp>
-#include <boost/range/iterator_range.hpp>
 
 
 namespace {
@@ -25,30 +24,41 @@ public:
     { }
 };
 
+// The const analyser plugin... Implements the neccessary interface
+// to be a plugin. Parse command line arguments and dispatch the
+// real work to other classes.
 class Plugin : public clang::PluginASTAction {
 public:
     Plugin()
         : clang::PluginASTAction()
-        , FlagDebugChangeDetection("debug-change-detection",
-            llvm::cl::desc("Enable debug output for variable changes [Medve plugin]"),
-            llvm::cl::init(false))
-        , FlagDebugUsageDetection("debug-usage-detection",
-            llvm::cl::desc("Enable debug output for variable usages [Medve plugin]"),
-            llvm::cl::init(false))
+        , Debug("debug-medve",
+            llvm::cl::desc("Set the debugging level for Medve plugin:"),
+            llvm::cl::init(PseudoConstness),
+            llvm::cl::values(
+                clEnumVal(FuncionDeclaration, "Enable function detection"),
+                clEnumVal(Arguments, "Enable arguments detection"),
+                clEnumVal(LocalVariables, "Enable local variables detection"),
+                clEnumVal(MemberVariables, "Enable member variables detection"),
+                clEnumVal(VariableChanges, "Enable variable change detection"),
+                clEnumVal(VariableUsages, "Enable variable usage detection"),
+                clEnumValEnd))
     { }
 
 private:
+    // Decide wheater the compiler was invoked as C++ compiler or not.
     static bool IsCPlusPlus(clang::CompilerInstance const & Compiler) {
         clang::LangOptions const Opts = Compiler.getLangOpts();
         return (Opts.CPlusPlus) || (Opts.CPlusPlus0x);
     }
 
-    clang::ASTConsumer * CreateASTConsumer(clang::CompilerInstance & Compiler, llvm::StringRef) {
-        return IsCPlusPlus(Compiler)
-            ? (clang::ASTConsumer *) new VariableChecker(Compiler, FlagDebugChangeDetection, FlagDebugUsageDetection)
+    // ..:: Entry point for plugins ::..
+    clang::ASTConsumer * CreateASTConsumer(clang::CompilerInstance & C, llvm::StringRef) {
+        return IsCPlusPlus(C)
+            ? (clang::ASTConsumer *) new VariableChecker(C, Debug)
             : (clang::ASTConsumer *) new NullConsumer();
     }
 
+    // ..:: Entry point for plugins ::..
     bool ParseArgs(clang::CompilerInstance const &,
                    std::vector<std::string> const & Args) {
         std::vector<char const *> ArgPtrs;
@@ -58,9 +68,9 @@ private:
             ArgPtrs.push_back(prg_name);
         }
 
-        boost::transform( boost::make_iterator_range(Args.begin(), Args.end())
-                        , std::back_inserter(ArgPtrs)
-                        , boost::mem_fun_ref(&std::string::c_str));
+        boost::transform(Args,
+            std::back_inserter(ArgPtrs),
+            boost::mem_fun_ref(&std::string::c_str));
 
         llvm::cl::ParseCommandLineOptions(ArgPtrs.size(), &ArgPtrs.front());
 
@@ -68,8 +78,7 @@ private:
     }
 
 private:
-    llvm::cl::opt<bool> FlagDebugChangeDetection;
-    llvm::cl::opt<bool> FlagDebugUsageDetection;
+    llvm::cl::opt<Target> Debug;
 };
 
 } // namespace anonymous

@@ -258,22 +258,38 @@ private:
 } // namespace anonymous
 
 
-VariableChecker::VariableChecker(clang::CompilerInstance const & Compiler, bool const InDebugChanges, bool const InDebugUsages)
-    : clang::ASTConsumer()
+VariableChecker::VariableChecker(clang::CompilerInstance const & Compiler, Target T)
+    : boost::noncopyable()
+    , clang::ASTConsumer()
     , Reporter(Compiler.getDiagnostics())
-    , DebugChanges(InDebugChanges)
-    , DebugUsages(InDebugUsages)
+    , State(T)
 { }
 
 void VariableChecker::HandleTranslationUnit(clang::ASTContext & Ctx) {
     FunctionCollector Collector;
     Collector.TraverseDecl(Ctx.getTranslationUnitDecl());
 
-    if (DebugChanges) {
+    switch (State) {
+    case FuncionDeclaration :
+        Collector.DumpFuncionDeclaration(Reporter);
+        break;
+    case Arguments :
+        Collector.DumpArguments(Reporter);
+        break;
+    case LocalVariables :
+        Collector.DumpLocalVariables(Reporter);
+        break;
+    case MemberVariables :
+        Collector.DumpMemberVariables(Reporter);
+        break;
+    case VariableChanges :
         Collector.DumpVariableChanges(Reporter);
-    } else if (DebugUsages) {
+        break;
+    case VariableUsages :
         Collector.DumpVariableUsages(Reporter);
-    } else {
+        break;
+    case PseudoConstness :
         Collector.DumpPseudoConstness(Reporter);
+        break;
     }
 }

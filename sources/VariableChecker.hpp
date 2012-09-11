@@ -7,21 +7,29 @@
 #include <clang/Basic/Diagnostic.h>
 #include <clang/Frontend/CompilerInstance.h>
 
+#include <boost/noncopyable.hpp>
 
-class VariableChecker : public clang::ASTConsumer {
+enum Target
+    { FuncionDeclaration
+    , Arguments
+    , LocalVariables
+    , MemberVariables
+    , VariableChanges
+    , VariableUsages
+    , PseudoConstness
+    };
+
+// FIXME: Variable checker is a very wrong name for this class.
+// It does run the pseudo const analysis on the given translation unit.
+class VariableChecker : public boost::noncopyable, public clang::ASTConsumer {
 public:
-    VariableChecker(clang::CompilerInstance const &, bool DebugChanges, bool DebugUsages);
+    VariableChecker(clang::CompilerInstance const &, Target);
 
     void HandleTranslationUnit(clang::ASTContext &);
 
 private:
     clang::DiagnosticsEngine & Reporter;
-    bool const DebugChanges;
-    bool const DebugUsages;
-
-private:
-    VariableChecker(VariableChecker const &);
-    VariableChecker & operator=(VariableChecker const &);
+    Target const State;
 };
 
 #endif // _variable_checker_hpp_
