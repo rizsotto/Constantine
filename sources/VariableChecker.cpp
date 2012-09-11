@@ -6,7 +6,9 @@
 #include <algorithm>
 #include <functional>
 #include <iterator>
-#include <cassert>
+
+#include <clang/AST/AST.h>
+#include <clang/AST/RecursiveASTVisitor.h>
 
 #include <boost/noncopyable.hpp>
 #include <boost/bind.hpp>
@@ -18,26 +20,23 @@
 #include <boost/range/algorithm/for_each.hpp>
 #include <boost/range/algorithm/transform.hpp>
 
-#include <clang/AST/AST.h>
-#include <clang/AST/RecursiveASTVisitor.h>
-
 
 namespace {
 
 // Report function for pseudo constness analysis.
-void ReportVariablePseudoConstness(clang::DiagnosticsEngine & DE, clang::VarDecl const * const Decl) {
-    static char const * const Message = "variable '%0' could be declared as const [Medve plugin]";
-    unsigned const DiagID = DE.getCustomDiagID(clang::DiagnosticsEngine::Warning, Message);
-    clang::DiagnosticBuilder DB = DE.Report(Decl->getLocStart(), DiagID);
-    DB << Decl->getNameAsString();
+void ReportVariablePseudoConstness(clang::DiagnosticsEngine & DE, clang::VarDecl const * const V) {
+    static char const * const Message = "variable '%0' could be declared as const";
+    unsigned const Id = DE.getCustomDiagID(clang::DiagnosticsEngine::Warning, Message);
+    clang::DiagnosticBuilder DB = DE.Report(V->getLocStart(), Id);
+    DB << V->getNameAsString();
 }
 
 // Report function for debug functionality.
-void ReportVariableDeclaration(clang::DiagnosticsEngine & DE, clang::VarDecl const * const Decl) {
+void ReportVariableDeclaration(clang::DiagnosticsEngine & DE, clang::VarDecl const * const V) {
     static char const * const Message = "variable '%0' declared here";
-    unsigned const DiagID = DE.getCustomDiagID(clang::DiagnosticsEngine::Note, Message);
-    clang::DiagnosticBuilder DB = DE.Report(Decl->getLocStart(), DiagID);
-    DB << Decl->getNameAsString();
+    unsigned const Id = DE.getCustomDiagID(clang::DiagnosticsEngine::Note, Message);
+    clang::DiagnosticBuilder DB = DE.Report(V->getLocStart(), Id);
+    DB << V->getNameAsString();
     DB.setForceEmit();
 }
 
@@ -53,9 +52,9 @@ void ReportFunctionDeclaration(clang::DiagnosticsEngine & DE, clang::FunctionDec
 typedef std::set<clang::VarDecl const *> Variables;
 
 
-// Pseudo constness analysis try to detect what variable can be declare as const.
-// This analysis runs through multiple scopes. We need to store the state of the
-// ongoing analysis. Once the variable was changed can't be const.
+// Pseudo constness analysis detects what variable can be declare as const.
+// This analysis runs through multiple scopes. We need to store the state of
+// the ongoing analysis. Once the variable was changed can't be const.
 class PseudoConstnessAnalysisState : public boost::noncopyable {
 public:
     PseudoConstnessAnalysisState()
@@ -64,21 +63,22 @@ public:
         , Changed()
     { }
 
-    void Eval( ConstantAnalysis const & Analysis, clang::VarDecl const * const Decl) {
-        if (Analysis.WasChanged(Decl)) {
-            Candidates.erase(Decl);
-            Changed.insert(Decl);
-        } else if (Analysis.WasReferenced(Decl)) {
-            if (Changed.end() == Changed.find(Decl)) {
-                if (! IsConst(*Decl)) {
-                    Candidates.insert(Decl);
+    void Eval(ConstantAnalysis const & Analysis, clang::VarDecl const * const V) {
+        if (Analysis.WasChanged(V)) {
+            Candidates.erase(V);
+            Changed.insert(V);
+        } else if (Analysis.WasReferenced(V)) {
+            if (Changed.end() == Changed.find(V)) {
+                if (! IsConst(*V)) {
+                    Candidates.insert(V);
                 }
             }
         }
     }
 
     void GenerateReports(clang::DiagnosticsEngine & DE) {
-        boost::for_each(Candidates, boost::bind(ReportVariablePseudoConstness, boost::ref(DE), _1));
+        boost::for_each(Candidates,
+            boost::bind(ReportVariablePseudoConstness, boost::ref(DE), _1));
     }
 
 private:
@@ -166,11 +166,9 @@ public:
     { }
 
 protected:
-    struct CastVarDecl {
-        clang::VarDecl const * operator()(clang::Decl const * const Decl) const {
-            return clang::dyn_cast<clang::VarDecl const>(Decl);
-        }
-    };
+    static clang::VarDecl const * CastVarDecl(clang::Decl const * const Decl) {
+        return clang::dyn_cast<clang::VarDecl const>(Decl);
+    }
 
     clang::FunctionDecl const * GetFunctionDecl() const {
         return Function;
@@ -189,7 +187,7 @@ protected:
         boost::transform(
               boost::make_iterator_range(Function->decls_begin(), Function->decls_end())
             , std::insert_iterator<VarDeclSet>(Result, Result.begin())
-            , CastVarDecl()
+            , &FunctionDeclWrapper::CastVarDecl
         );
         Result.erase(0);
         return Result;
