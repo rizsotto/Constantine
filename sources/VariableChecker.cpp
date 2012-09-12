@@ -1,7 +1,7 @@
 // Copyright 2012 by Laszlo Nagy [see file MIT-LICENSE]
 
 #include "VariableChecker.hpp"
-#include "ConstantAnalysis.hpp"
+#include "ScopeAnalysis.hpp"
 
 #include <algorithm>
 #include <functional>
@@ -63,7 +63,7 @@ public:
         , Changed()
     { }
 
-    void Eval(ConstantAnalysis const & Analysis, clang::VarDecl const * const V) {
+    void Eval(ScopeAnalysis const & Analysis, clang::VarDecl const * const V) {
         if (Analysis.WasChanged(V)) {
             Candidates.erase(V);
             Changed.insert(V);
@@ -136,19 +136,19 @@ void FunctionWrapper::DumpMemberVariables(clang::DiagnosticsEngine & DE) const {
 
 void FunctionWrapper::DumpVariableChanges(clang::DiagnosticsEngine & DE) const {
     clang::FunctionDecl const * F = GetFunctionDecl();
-    ConstantAnalysis const & Analysis = ConstantAnalysis::AnalyseThis(*(F->getBody()));
+    ScopeAnalysis const & Analysis = ScopeAnalysis::AnalyseThis(*(F->getBody()));
     Analysis.DebugChanged(DE);
 }
 
 void FunctionWrapper::DumpVariableUsages(clang::DiagnosticsEngine & DE) const {
     clang::FunctionDecl const * F = GetFunctionDecl();
-    ConstantAnalysis const & Analysis = ConstantAnalysis::AnalyseThis(*(F->getBody()));
+    ScopeAnalysis const & Analysis = ScopeAnalysis::AnalyseThis(*(F->getBody()));
     Analysis.DebugReferenced(DE);
 }
 
 void FunctionWrapper::CheckPseudoConstness(PseudoConstnessAnalysisState & State) const {
     clang::FunctionDecl const * F = GetFunctionDecl();
-    ConstantAnalysis const & Analysis = ConstantAnalysis::AnalyseThis(*(F->getBody()));
+    ScopeAnalysis const & Analysis = ScopeAnalysis::AnalyseThis(*(F->getBody()));
 
     boost::for_each(GetArguments(),
         boost::bind(&PseudoConstnessAnalysisState::Eval, &State, boost::cref(Analysis), _1));

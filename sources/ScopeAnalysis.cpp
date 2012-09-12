@@ -1,6 +1,6 @@
 // Copyright 2012 by Laszlo Nagy [see file MIT-LICENSE]
 
-#include "ConstantAnalysis.hpp"
+#include "ScopeAnalysis.hpp"
 
 #include <algorithm>
 #include <functional>
@@ -15,26 +15,26 @@ namespace {
 // Collect named variables and do emit diagnostic messages for tests.
 class VerboseVariableCollector {
 public:
-    VerboseVariableCollector(ConstantAnalysis::Variables & Out)
+    VerboseVariableCollector(ScopeAnalysis::Variables & Out)
         : Results(Out)
     { }
 
 protected:
     void AddToResults(clang::Decl const * const D, clang::SourceRange const & Location) {
         if (clang::VarDecl const * const VD = clang::dyn_cast<clang::VarDecl const>(D)) {
-            ConstantAnalysis::Variables::iterator It = Results.find(VD);
+            ScopeAnalysis::Variables::iterator It = Results.find(VD);
             if (Results.end() == It) {
-                std::pair<ConstantAnalysis::Variables::iterator, bool> R =
-                    Results.insert(ConstantAnalysis::Variables::value_type(VD, ConstantAnalysis::Locations()));
+                std::pair<ScopeAnalysis::Variables::iterator, bool> R =
+                    Results.insert(ScopeAnalysis::Variables::value_type(VD, ScopeAnalysis::Locations()));
                 It = R.first;
             }
-            ConstantAnalysis::Locations & Ls = It->second;
+            ScopeAnalysis::Locations & Ls = It->second;
             Ls.push_back(Location);
         }
     }
 
 private:
-    ConstantAnalysis::Variables & Results;
+    ScopeAnalysis::Variables & Results;
 };
 
 // Collect all variables which were mutated in the given scope.
@@ -43,7 +43,7 @@ class VariableChangeCollector
     : public VerboseVariableCollector
     , public clang::RecursiveASTVisitor<VariableChangeCollector> {
 public:
-    VariableChangeCollector(ConstantAnalysis::Variables & Out)
+    VariableChangeCollector(ScopeAnalysis::Variables & Out)
         : VerboseVariableCollector(Out)
         , clang::RecursiveASTVisitor<VariableChangeCollector>()
     { }
@@ -121,6 +121,7 @@ public:
 
 private:
     /*** source looks like this ***
+        $ cat ../show.cpp
 
         void by_pointer(int *) { }
 
@@ -144,6 +145,7 @@ private:
         }
 
         *** AST looks like this ***
+        $ clang++ -cc1 -ast-dump ../show.cpp
 
         void test() (CompoundStmt 0x40d3c48 <./show.cpp:12:13, line:21:1>
           (DeclStmt 0x40d3558 <line:13:5, col:14>
@@ -206,7 +208,7 @@ class VariableAccessCollector
     : public VerboseVariableCollector
     , public clang::RecursiveASTVisitor<VariableAccessCollector> {
 public:
-    VariableAccessCollector(ConstantAnalysis::Variables & Out)
+    VariableAccessCollector(ScopeAnalysis::Variables & Out)
         : VerboseVariableCollector(Out)
         , clang::RecursiveASTVisitor<VariableAccessCollector>()
     { }
@@ -224,12 +226,12 @@ public:
     }
 };
 
-void Report( ConstantAnalysis::Variables::value_type const & Var
+void Report( ScopeAnalysis::Variables::value_type const & Var
            , char const * const Message
            , clang::DiagnosticsEngine & DE) {
     unsigned const Id = DE.getCustomDiagID(clang::DiagnosticsEngine::Note, Message);
-    ConstantAnalysis::Locations const & Ls = Var.second;
-    for (ConstantAnalysis::Locations::const_iterator It(Ls.begin()), End(Ls.end()); It != End; ++It) {
+    ScopeAnalysis::Locations const & Ls = Var.second;
+    for (ScopeAnalysis::Locations::const_iterator It(Ls.begin()), End(Ls.end()); It != End; ++It) {
         clang::DiagnosticBuilder DB = DE.Report(It->getBegin(), Id);
         DB << Var.first->getNameAsString();
         DB.AddSourceRange(clang::CharSourceRange::getTokenRange(*It));
@@ -239,8 +241,8 @@ void Report( ConstantAnalysis::Variables::value_type const & Var
 
 } // namespace anonymous
 
-ConstantAnalysis ConstantAnalysis::AnalyseThis(clang::Stmt const & Stmt) {
-    ConstantAnalysis Result;
+ScopeAnalysis ScopeAnalysis::AnalyseThis(clang::Stmt const & Stmt) {
+    ScopeAnalysis Result;
     {
         VariableChangeCollector Visitor(Result.Changed);
         Visitor.TraverseStmt(const_cast<clang::Stmt*>(&Stmt));
@@ -252,20 +254,20 @@ ConstantAnalysis ConstantAnalysis::AnalyseThis(clang::Stmt const & Stmt) {
     return Result;
 }
 
-bool ConstantAnalysis::WasChanged(clang::VarDecl const * const Decl) const {
+bool ScopeAnalysis::WasChanged(clang::VarDecl const * const Decl) const {
     return (Changed.end() != Changed.find(Decl));
 }
 
-bool ConstantAnalysis::WasReferenced(clang::VarDecl const * const Decl) const {
+bool ScopeAnalysis::WasReferenced(clang::VarDecl const * const Decl) const {
     return (Used.end() != Used.find(Decl));
 }
 
-void ConstantAnalysis::DebugChanged(clang::DiagnosticsEngine & DE) const {
+void ScopeAnalysis::DebugChanged(clang::DiagnosticsEngine & DE) const {
     std::for_each(Changed.begin(), Changed.end(),
         boost::bind(Report, _1, "variable '%0' was changed", boost::ref(DE)));
 }
 
-void ConstantAnalysis::DebugReferenced(clang::DiagnosticsEngine & DE) const {
+void ScopeAnalysis::DebugReferenced(clang::DiagnosticsEngine & DE) const {
     std::for_each(Used.begin(), Used.end(),
         boost::bind(Report, _1, "variable '%0' was used", boost::ref(DE)));
 }

@@ -3,7 +3,7 @@
 set(ourlib_target Medve)
 
 set(ourlib_sources
-    ConstantAnalysis.cpp
+    ScopeAnalysis.cpp
     PluginMain.cpp
     VariableChecker.cpp
 )
