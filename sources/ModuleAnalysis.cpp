@@ -3,9 +3,8 @@
 #include "ModuleAnalysis.hpp"
 #include "ScopeAnalysis.hpp"
 
-#include <algorithm>
-#include <functional>
 #include <iterator>
+#include <map>
 
 #include <clang/AST/AST.h>
 #include <clang/AST/RecursiveASTVisitor.h>
@@ -14,8 +13,7 @@
 #include <boost/bind.hpp>
 #include <boost/shared_ptr.hpp>
 #include <boost/range.hpp>
-#include <boost/range/adaptor/filtered.hpp>
-#include <boost/range/adaptor/transformed.hpp>
+#include <boost/range/adaptor/map.hpp>
 #include <boost/range/algorithm/copy.hpp>
 #include <boost/range/algorithm/for_each.hpp>
 #include <boost/range/algorithm/transform.hpp>
@@ -123,15 +121,18 @@ void FunctionWrapper::DumpFuncionDeclaration(clang::DiagnosticsEngine & DE) cons
 }
 
 void FunctionWrapper::DumpArguments(clang::DiagnosticsEngine & DE) const {
-    boost::for_each(GetArguments(), boost::bind(ReportVariableDeclaration, DE, _1));
+    boost::for_each(GetArguments(),
+        boost::bind(ReportVariableDeclaration, boost::ref(DE), _1));
 }
 
 void FunctionWrapper::DumpLocalVariables(clang::DiagnosticsEngine & DE) const {
-    boost::for_each(GetLocals(), boost::bind(ReportVariableDeclaration, DE, _1));
+    boost::for_each(GetLocals(),
+        boost::bind(ReportVariableDeclaration, boost::ref(DE), _1));
 }
 
 void FunctionWrapper::DumpMemberVariables(clang::DiagnosticsEngine & DE) const {
-    boost::for_each(GetMembers(), boost::bind(ReportVariableDeclaration, DE, _1));
+    boost::for_each(GetMembers(),
+        boost::bind(ReportVariableDeclaration, boost::ref(DE), _1));
 }
 
 void FunctionWrapper::DumpVariableChanges(clang::DiagnosticsEngine & DE) const {
@@ -158,6 +159,7 @@ void FunctionWrapper::CheckPseudoConstness(PseudoConstnessAnalysisState & State)
         boost::bind(&PseudoConstnessAnalysisState::Eval, &State, boost::cref(Analysis), _1));
 }
 
+// Implement wrapper for simple C functions.
 class FunctionDeclWrapper : public FunctionWrapper {
 public:
     FunctionDeclWrapper(clang::FunctionDecl const * const F)
@@ -167,7 +169,15 @@ public:
 
 protected:
     static clang::VarDecl const * CastVarDecl(clang::Decl const * const Decl) {
-        return clang::dyn_cast<clang::VarDecl const>(Decl);
+        clang::VarDecl const * const Candidate =
+            clang::dyn_cast<clang::VarDecl const>(Decl);
+
+        return
+            (   (0 != Candidate)
+            &&  (0 == clang::dyn_cast<clang::ParmVarDecl const>(Candidate))
+            )
+                ? Candidate
+                : 0;
     }
 
     clang::FunctionDecl const * GetFunctionDecl() const {
@@ -206,51 +216,56 @@ private:
 class FunctionCollector : public clang::RecursiveASTVisitor<FunctionCollector> {
 public:
     void DumpFuncionDeclaration(clang::DiagnosticsEngine & DE) const {
-        boost::for_each(Functions,
+        boost::for_each(Functions | boost::adaptors::map_values,
             boost::bind(&FunctionWrapper::DumpFuncionDeclaration, _1, boost::ref(DE)));
     }
 
     void DumpArguments(clang::DiagnosticsEngine & DE) const {
-        boost::for_each(Functions,
+        boost::for_each(Functions | boost::adaptors::map_values,
             boost::bind(&FunctionWrapper::DumpArguments, _1, boost::ref(DE)));
     }
 
     void DumpLocalVariables(clang::DiagnosticsEngine & DE) const {
-        boost::for_each(Functions,
+        boost::for_each(Functions | boost::adaptors::map_values,
             boost::bind(&FunctionWrapper::DumpLocalVariables, _1, boost::ref(DE)));
     }
 
     void DumpMemberVariables(clang::DiagnosticsEngine & DE) const {
-        boost::for_each(Functions,
+        boost::for_each(Functions | boost::adaptors::map_values,
             boost::bind(&FunctionWrapper::DumpMemberVariables, _1, boost::ref(DE)));
     }
 
     void DumpVariableChanges(clang::DiagnosticsEngine & DE) const {
-        boost::for_each(Functions,
+        boost::for_each(Functions | boost::adaptors::map_values,
             boost::bind(&FunctionWrapper::DumpVariableChanges, _1, boost::ref(DE)));
     }
 
     void DumpVariableUsages(clang::DiagnosticsEngine & DE) const {
-        boost::for_each(Functions,
+        boost::for_each(Functions | boost::adaptors::map_values,
             boost::bind(&FunctionWrapper::DumpVariableUsages, _1, boost::ref(DE)));
     }
 
     void DumpPseudoConstness(clang::DiagnosticsEngine & DE) const {
         PseudoConstnessAnalysisState State;
-        boost::for_each(Functions,
+        boost::for_each(Functions | boost::adaptors::map_values,
             boost::bind(&FunctionWrapper::CheckPseudoConstness, _1, boost::ref(State)));
         State.GenerateReports(DE);
     }
 
     // this is for visitor pattern
     bool VisitFunctionDecl(clang::FunctionDecl const * F) {
-        Functions.insert( FunctionWrapperPtr(new FunctionDeclWrapper(F)) );
+        clang::FunctionDecl const * const CD = F->getCanonicalDecl();
+        if (F->isThisDeclarationADefinition()) {
+            if (Functions.end() == Functions.find(CD)) {
+                Functions[CD] = FunctionWrapperPtr(new FunctionDeclWrapper(F));
+            }
+        }
         return true;
     }
 
 private:
     typedef boost::shared_ptr<FunctionWrapper> FunctionWrapperPtr;
-    typedef std::set<FunctionWrapperPtr> FunctionWrapperPtrs;
+    typedef std::map<clang::FunctionDecl const *, FunctionWrapperPtr> FunctionWrapperPtrs;
 
     FunctionWrapperPtrs Functions;
 };
