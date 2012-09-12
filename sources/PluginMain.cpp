@@ -1,6 +1,6 @@
 // Copyright 2012 by Laszlo Nagy [see file MIT-LICENSE]
 
-#include "VariableChecker.hpp"
+#include "ModuleAnalysis.hpp"
 
 #include <iterator>
 
@@ -54,7 +54,7 @@ private:
     // ..:: Entry point for plugins ::..
     clang::ASTConsumer * CreateASTConsumer(clang::CompilerInstance & C, llvm::StringRef) {
         return IsCPlusPlus(C)
-            ? (clang::ASTConsumer *) new VariableChecker(C, Debug)
+            ? (clang::ASTConsumer *) new ModuleAnalysis(C, Debug)
             : (clang::ASTConsumer *) new NullConsumer();
     }
 

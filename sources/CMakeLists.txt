@@ -5,7 +5,7 @@ set(ourlib_target Medve)
 set(ourlib_sources
     ScopeAnalysis.cpp
     PluginMain.cpp
-    VariableChecker.cpp
+    ModuleAnalysis.cpp
 )
 
 set(ourlib_symbols ${CMAKE_CURRENT_SOURCE_DIR}/ExportedSymbolsList)

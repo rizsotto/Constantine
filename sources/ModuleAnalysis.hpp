@@ -1,7 +1,7 @@
 // Copyright 2012 by Laszlo Nagy [see file MIT-LICENSE]
 
-#ifndef _variable_checker_hpp_
-#define _variable_checker_hpp_
+#ifndef _ModuleAnalysis_hpp_
+#define _ModuleAnalysis_hpp_
 
 #include <clang/AST/ASTConsumer.h>
 #include <clang/Basic/Diagnostic.h>
@@ -19,11 +19,10 @@ enum Target
     , PseudoConstness
     };
 
-// FIXME: Variable checker is a very wrong name for this class.
-// It does run the pseudo const analysis on the given translation unit.
-class VariableChecker : public boost::noncopyable, public clang::ASTConsumer {
+// It runs the pseudo const analysis on the given translation unit.
+class ModuleAnalysis : public boost::noncopyable, public clang::ASTConsumer {
 public:
-    VariableChecker(clang::CompilerInstance const &, Target);
+    ModuleAnalysis(clang::CompilerInstance const &, Target);
 
     void HandleTranslationUnit(clang::ASTContext &);
 
@@ -32,4 +31,4 @@ private:
     Target const State;
 };
 
-#endif // _variable_checker_hpp_
+#endif // _ModuleAnalysis_hpp_

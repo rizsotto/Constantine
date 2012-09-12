@@ -1,6 +1,6 @@
 // Copyright 2012 by Laszlo Nagy [see file MIT-LICENSE]
 
-#include "VariableChecker.hpp"
+#include "ModuleAnalysis.hpp"
 #include "ScopeAnalysis.hpp"
 
 #include <algorithm>
@@ -258,14 +258,14 @@ private:
 } // namespace anonymous
 
 
-VariableChecker::VariableChecker(clang::CompilerInstance const & Compiler, Target T)
+ModuleAnalysis::ModuleAnalysis(clang::CompilerInstance const & Compiler, Target T)
     : boost::noncopyable()
     , clang::ASTConsumer()
     , Reporter(Compiler.getDiagnostics())
     , State(T)
 { }
 
-void VariableChecker::HandleTranslationUnit(clang::ASTContext & Ctx) {
+void ModuleAnalysis::HandleTranslationUnit(clang::ASTContext & Ctx) {
     FunctionCollector Collector;
     Collector.TraverseDecl(Ctx.getTranslationUnitDecl());
 
