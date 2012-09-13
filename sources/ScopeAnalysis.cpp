@@ -56,13 +56,7 @@ public:
             return true;
 
         switch (Stmt->getOpcode()) {
-        case clang::BO_Assign: {
-            clang::Decl const * const RHSDecl =
-                GetDeclaration(Stmt->getRHS()->IgnoreParenCasts());
-            if (LHSDecl == RHSDecl) {
-                break;
-            }
-        }
+        case clang::BO_Assign:
         case clang::BO_MulAssign:
         case clang::BO_DivAssign:
         case clang::BO_RemAssign:

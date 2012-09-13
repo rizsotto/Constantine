@@ -1,4 +1,4 @@
-// RUN: %clang_cc1 %s %show_local_variables -fsyntax-only -verify
+// RUN: %clang_cc1 %show_local_variables %s -fsyntax-only -verify
 
 void f1(int a, int b) {
     int i = 0; // expected-note {{variable 'i' declared here}}

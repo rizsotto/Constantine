@@ -1,4 +1,4 @@
-// RUN: %clang_cc1 %s %show_functions -fsyntax-only -verify
+// RUN: %clang_cc1 %show_functions %s -fsyntax-only -verify
 
 void f1() { // expected-note {{function 'f1' declared here}}
 }
