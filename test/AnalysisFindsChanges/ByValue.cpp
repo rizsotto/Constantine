@@ -1,4 +1,13 @@
-// RUN: %clang_cc1 %s %change -fsyntax-only -verify
+// RUN: %clang_cc1 %change %s -fsyntax-only -verify
+
+void unary_operators() {
+    int i = 0;
+
+    ++i; // expected-note {{variable 'i' was changed}}
+    --i; // expected-note {{variable 'i' was changed}}
+    i++; // expected-note {{variable 'i' was changed}}
+    i--; // expected-note {{variable 'i' was changed}}
+}
 
 void binary_operators() {
     int i = 0;
@@ -14,15 +23,10 @@ void binary_operators() {
     i |= 2; // expected-note {{variable 'i' was changed}}
     i ^= 2; // expected-note {{variable 'i' was changed}}
     i &= 1; // expected-note {{variable 'i' was changed}}
-}
 
-void unary_operators() {
-    int i = 0;
-
-    ++i; // expected-note {{variable 'i' was changed}}
-    --i; // expected-note {{variable 'i' was changed}}
-    i++; // expected-note {{variable 'i' was changed}}
-    i--; // expected-note {{variable 'i' was changed}}
+    int j = 0;
+    i = // expected-note {{variable 'i' was changed}}
+        ++j; // expected-note {{variable 'j' was changed}}
 }
 
 void change_in_for_loop() {
