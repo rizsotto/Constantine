@@ -12,6 +12,42 @@
 
 namespace {
 
+// Declaration extract method implemented in visitor style.
+class DeclarationCollector
+    : public clang::RecursiveASTVisitor<DeclarationCollector> {
+public:
+    typedef std::pair<clang::VarDecl const *, clang::QualType> UsageRef;
+
+    static UsageRef GetDeclaration(clang::Stmt const & Stmt) {
+        UsageRef Result(0, clang::QualType());
+        {
+            DeclarationCollector Visitor(Result);
+            Visitor.TraverseStmt(const_cast<clang::Stmt*>(&Stmt));
+        }
+        return Result;
+    }
+
+protected:
+    DeclarationCollector(UsageRef & In)
+        : clang::RecursiveASTVisitor<DeclarationCollector>()
+        , Result(In)
+    { }
+
+public:
+    bool VisitDeclRefExpr(clang::DeclRefExpr const * const D) {
+        static clang::QualType const EmptyType = clang::QualType();
+
+        if (clang::VarDecl const * const VD = clang::dyn_cast<clang::VarDecl const>(D->getDecl())) {
+            Result.first = VD;
+            Result.second = D->getType();
+        }
+        return true;
+    }
+
+protected:
+    UsageRef & Result;
+};
+
 // Collect named variables and do emit diagnostic messages for tests.
 class UsageRefCollector {
 public:
@@ -20,8 +56,15 @@ public:
     { }
 
 protected:
-    void AddToResults(clang::Decl const * const D, clang::SourceRange const & L, clang::QualType const T) {
-        if (clang::VarDecl const * const VD = clang::dyn_cast<clang::VarDecl const>(D)) {
+    void AddToResults(clang::Decl const * const D, clang::SourceRange const & L) {
+        DeclarationCollector::UsageRef
+            U(clang::dyn_cast<clang::VarDecl const>(D), clang::QualType());
+
+        return AddToResults(U, L);
+    }
+
+    void AddToResults(DeclarationCollector::UsageRef const & U, clang::SourceRange const & L) {
+        if (clang::VarDecl const * const VD = U.first) {
             ScopeAnalysis::UsageRefsMap::iterator It = Results.find(VD);
             if (Results.end() == It) {
                 std::pair<ScopeAnalysis::UsageRefsMap::iterator, bool> R =
@@ -29,7 +72,7 @@ protected:
                 It = R.first;
             }
             ScopeAnalysis::UsageRefs & Ls = It->second;
-            Ls.push_back(ScopeAnalysis::UsageRef(T, L));
+            Ls.push_back(ScopeAnalysis::UsageRef(U.second, L));
         }
     }
 
@@ -50,10 +93,8 @@ public:
 
     // Assignments are mutating variables.
     bool VisitBinaryOperator(clang::BinaryOperator const * const Stmt) {
-        clang::Decl const * const LHSDecl =
-            GetDeclaration(Stmt->getLHS()->IgnoreParenCasts());
-        if (!LHSDecl)
-            return true;
+        DeclarationCollector::UsageRef const & U =
+            DeclarationCollector::GetDeclaration(*(Stmt->getLHS()));
 
         switch (Stmt->getOpcode()) {
         case clang::BO_Assign:
@@ -67,7 +108,7 @@ public:
         case clang::BO_AndAssign:
         case clang::BO_XorAssign:
         case clang::BO_OrAssign:
-            AddToResults(LHSDecl, Stmt->getSourceRange(), Stmt->getType());
+            AddToResults(U, Stmt->getSourceRange());
             break;
         default:
             break;
@@ -77,17 +118,15 @@ public:
 
     // Some operator does mutate variables.
     bool VisitUnaryOperator(clang::UnaryOperator const * const Stmt) {
-        clang::Decl const * const D =
-            GetDeclaration(Stmt->getSubExpr()->IgnoreParenCasts());
-        if (!D)
-            return true;
+        DeclarationCollector::UsageRef const & U =
+            DeclarationCollector::GetDeclaration(*(Stmt->getSubExpr()));
 
         switch (Stmt->getOpcode()) {
         case clang::UO_PostInc:
         case clang::UO_PostDec:
         case clang::UO_PreInc:
         case clang::UO_PreDec:
-            AddToResults(D, Stmt->getSourceRange(), Stmt->getType());
+            AddToResults(U, Stmt->getSourceRange());
             break;
         default:
             break;
@@ -177,22 +216,10 @@ private:
      */
     inline
     void AddToResultsWhenReferedWithoutCast(clang::Expr const * const Stmt) {
-        if (clang::Decl const * const D = GetDeclaration(Stmt)) {
-            AddToResults(D, Stmt->getSourceRange(), Stmt->getType());
-        }
-    }
+        DeclarationCollector::UsageRef const & U =
+            DeclarationCollector::GetDeclaration(*(Stmt));
 
-    // FIXME: extract clang::Decl from an clang::Expr, but only if
-    // it is variable access or member access. Don't we have a better
-    // name for it? And shall it be that specific, although the name
-    // is so generic?
-    static clang::Decl const * GetDeclaration(clang::Expr const * const Stmt) {
-        if (clang::DeclRefExpr const * const DR = clang::dyn_cast<clang::DeclRefExpr const>(Stmt)) {
-            return DR->getDecl();
-        } else if (clang::MemberExpr const * const ME = clang::dyn_cast<clang::MemberExpr const>(Stmt)) {
-            return GetDeclaration(ME->getBase());
-        }
-        return 0;
+        AddToResults(U, Stmt->getSourceRange());
     }
 };
 
@@ -209,13 +236,13 @@ public:
 
     // Variable access is a usage of the variable.
     bool VisitDeclRefExpr(clang::DeclRefExpr const * const Stmt) {
-        AddToResults(Stmt->getDecl(), Stmt->getSourceRange(), Stmt->getType());
+        AddToResults(Stmt->getDecl(), Stmt->getSourceRange());
         return true;
     }
 
     // Member access is a usage of the class.
     bool VisitMemberExpr(clang::MemberExpr const * const Stmt) {
-        AddToResults(Stmt->getMemberDecl(), Stmt->getSourceRange(), Stmt->getType());
+        AddToResults(Stmt->getMemberDecl(), Stmt->getSourceRange());
         return true;
     }
 };
