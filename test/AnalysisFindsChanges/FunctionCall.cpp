@@ -21,24 +21,24 @@ void function_call_test() {
     int i = 0;
 
     inc(i);
-    inc_ref(i); // expected-note {{variable 'i' was changed}}
+    inc_ref(i); // expected-note {{variable 'i' with type 'int' was changed}}
     inc_const_ref(i);
-    inc_p(&i); // expected-note {{variable 'i' was changed}}
+    inc_p(&i); // expected-note {{variable 'i' with type 'int' was changed}}
     inc_const_p(&i);
 
     int iref = i;
 
     inc(iref);
-    inc_ref(iref); // expected-note {{variable 'iref' was changed}}
+    inc_ref(iref); // expected-note {{variable 'iref' with type 'int' was changed}}
     inc_const_ref(iref);
-    inc_p(&iref); // expected-note {{variable 'iref' was changed}}
+    inc_p(&iref); // expected-note {{variable 'iref' with type 'int' was changed}}
     inc_const_p(&iref);
 
     int * iptr = &i;
 
     inc(*iptr);
-    inc_ref(*iptr); // expected-note {{variable 'iptr' was changed}}
+    inc_ref(*iptr); // expected-note {{variable 'iptr' with type 'int' was changed}}
     inc_const_ref(*iptr);
-    inc_p(iptr); // expected-note {{variable 'iptr' was changed}}
+    inc_p(iptr); // expected-note {{variable 'iptr' with type 'int' was changed}}
     inc_const_p(iptr);
 }

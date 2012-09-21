@@ -13,38 +13,38 @@
 namespace {
 
 // Collect named variables and do emit diagnostic messages for tests.
-class VerboseVariableCollector {
+class UsageRefCollector {
 public:
-    VerboseVariableCollector(ScopeAnalysis::Variables & Out)
+    UsageRefCollector(ScopeAnalysis::UsageRefsMap & Out)
         : Results(Out)
     { }
 
 protected:
-    void AddToResults(clang::Decl const * const D, clang::SourceRange const & Location) {
+    void AddToResults(clang::Decl const * const D, clang::SourceRange const & L, clang::QualType const T) {
         if (clang::VarDecl const * const VD = clang::dyn_cast<clang::VarDecl const>(D)) {
-            ScopeAnalysis::Variables::iterator It = Results.find(VD);
+            ScopeAnalysis::UsageRefsMap::iterator It = Results.find(VD);
             if (Results.end() == It) {
-                std::pair<ScopeAnalysis::Variables::iterator, bool> R =
-                    Results.insert(ScopeAnalysis::Variables::value_type(VD, ScopeAnalysis::Locations()));
+                std::pair<ScopeAnalysis::UsageRefsMap::iterator, bool> R =
+                    Results.insert(ScopeAnalysis::UsageRefsMap::value_type(VD, ScopeAnalysis::UsageRefs()));
                 It = R.first;
             }
-            ScopeAnalysis::Locations & Ls = It->second;
-            Ls.push_back(Location);
+            ScopeAnalysis::UsageRefs & Ls = It->second;
+            Ls.push_back(ScopeAnalysis::UsageRef(T, L));
         }
     }
 
 private:
-    ScopeAnalysis::Variables & Results;
+    ScopeAnalysis::UsageRefsMap & Results;
 };
 
 // Collect all variables which were mutated in the given scope.
 // (The scope is given by the TraverseStmt method.)
 class VariableChangeCollector
-    : public VerboseVariableCollector
+    : public UsageRefCollector
     , public clang::RecursiveASTVisitor<VariableChangeCollector> {
 public:
-    VariableChangeCollector(ScopeAnalysis::Variables & Out)
-        : VerboseVariableCollector(Out)
+    VariableChangeCollector(ScopeAnalysis::UsageRefsMap & Out)
+        : UsageRefCollector(Out)
         , clang::RecursiveASTVisitor<VariableChangeCollector>()
     { }
 
@@ -67,7 +67,7 @@ public:
         case clang::BO_AndAssign:
         case clang::BO_XorAssign:
         case clang::BO_OrAssign:
-            AddToResults(LHSDecl, Stmt->getSourceRange());
+            AddToResults(LHSDecl, Stmt->getSourceRange(), Stmt->getType());
             break;
         default:
             break;
@@ -87,7 +87,7 @@ public:
         case clang::UO_PostDec:
         case clang::UO_PreInc:
         case clang::UO_PreDec:
-            AddToResults(D, Stmt->getSourceRange());
+            AddToResults(D, Stmt->getSourceRange(), Stmt->getType());
             break;
         default:
             break;
@@ -178,7 +178,7 @@ private:
     inline
     void AddToResultsWhenReferedWithoutCast(clang::Expr const * const Stmt) {
         if (clang::Decl const * const D = GetDeclaration(Stmt)) {
-            AddToResults(D, Stmt->getSourceRange());
+            AddToResults(D, Stmt->getSourceRange(), Stmt->getType());
         }
     }
 
@@ -199,36 +199,36 @@ private:
 // Collect all variables which were accessed in the given scope.
 // (The scope is given by the TraverseStmt method.)
 class VariableAccessCollector
-    : public VerboseVariableCollector
+    : public UsageRefCollector
     , public clang::RecursiveASTVisitor<VariableAccessCollector> {
 public:
-    VariableAccessCollector(ScopeAnalysis::Variables & Out)
-        : VerboseVariableCollector(Out)
+    VariableAccessCollector(ScopeAnalysis::UsageRefsMap & Out)
+        : UsageRefCollector(Out)
         , clang::RecursiveASTVisitor<VariableAccessCollector>()
     { }
 
     // Variable access is a usage of the variable.
     bool VisitDeclRefExpr(clang::DeclRefExpr const * const Stmt) {
-        AddToResults(Stmt->getDecl(), Stmt->getSourceRange());
+        AddToResults(Stmt->getDecl(), Stmt->getSourceRange(), Stmt->getType());
         return true;
     }
 
     // Member access is a usage of the class.
     bool VisitMemberExpr(clang::MemberExpr const * const Stmt) {
-        AddToResults(Stmt->getMemberDecl(), Stmt->getSourceRange());
+        AddToResults(Stmt->getMemberDecl(), Stmt->getSourceRange(), Stmt->getType());
         return true;
     }
 };
 
-void Report( ScopeAnalysis::Variables::value_type const & Var
+void Report( ScopeAnalysis::UsageRefsMap::value_type const & Var
            , char const * const Message
            , clang::DiagnosticsEngine & DE) {
     unsigned const Id = DE.getCustomDiagID(clang::DiagnosticsEngine::Note, Message);
-    ScopeAnalysis::Locations const & Ls = Var.second;
-    for (ScopeAnalysis::Locations::const_iterator It(Ls.begin()), End(Ls.end()); It != End; ++It) {
-        clang::DiagnosticBuilder DB = DE.Report(It->getBegin(), Id);
+    ScopeAnalysis::UsageRefs const & Ls = Var.second;
+    for (ScopeAnalysis::UsageRefs::const_iterator It(Ls.begin()), End(Ls.end()); It != End; ++It) {
+        clang::DiagnosticBuilder DB = DE.Report(It->second.getBegin(), Id);
         DB << Var.first->getNameAsString();
-        DB.AddSourceRange(clang::CharSourceRange::getTokenRange(*It));
+        DB << It->first.getAsString();
         DB.setForceEmit();
     }
 }
@@ -258,7 +258,7 @@ bool ScopeAnalysis::WasReferenced(clang::VarDecl const * const Decl) const {
 
 void ScopeAnalysis::DebugChanged(clang::DiagnosticsEngine & DE) const {
     std::for_each(Changed.begin(), Changed.end(),
-        boost::bind(Report, _1, "variable '%0' was changed", boost::ref(DE)));
+        boost::bind(Report, _1, "variable '%0' with type '%1' was changed", boost::ref(DE)));
 }
 
 void ScopeAnalysis::DebugReferenced(clang::DiagnosticsEngine & DE) const {
