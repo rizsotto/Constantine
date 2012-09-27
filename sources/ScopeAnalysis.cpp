@@ -14,18 +14,18 @@ namespace {
 class UsageExtractor
     : public clang::RecursiveASTVisitor<UsageExtractor> {
 public:
-    // Represents the used variable and the type of usage.
-    struct Usage {
-        clang::VarDecl const * Variable;
-        clang::QualType Type;
-    };
+    typedef ScopeAnalysis::UsageRef UsageRef;
+    typedef std::pair<clang::VarDecl const *, UsageRef> Usage;
 
-    static Usage GetUsage(clang::Stmt const & Stmt) {
-        Usage Result = { 0, clang::QualType() };
+    static Usage GetUsage(clang::Expr const & Expr) {
+        Usage Result;
         {
+            clang::Stmt const * const Stmt = &Expr;
+
             UsageExtractor Visitor(Result);
-            Visitor.TraverseStmt(const_cast<clang::Stmt*>(&Stmt));
+            Visitor.TraverseStmt(const_cast<clang::Stmt*>(Stmt));
         }
+        Result.second.second = Expr.getSourceRange();
         return Result;
     }
 
@@ -39,8 +39,8 @@ public:
     // public visitor method.
     bool VisitDeclRefExpr(clang::DeclRefExpr const * const D) {
         if (clang::VarDecl const * const VD = clang::dyn_cast<clang::VarDecl const>(D->getDecl())) {
-            Result.Variable = VD;
-            Result.Type = D->getType();
+            Result.first = VD;
+            Result.second.first = D->getType();
         }
         return true;
     }
@@ -60,7 +60,7 @@ public:
 protected:
     void AddToResults(clang::Expr const * const Stmt) {
         UsageExtractor::Usage const & U = UsageExtractor::GetUsage(*Stmt);
-        if (clang::VarDecl const * const VD = U.Variable) {
+        if (clang::VarDecl const * const VD = U.first) {
             ScopeAnalysis::UsageRefsMap::iterator It = Results.find(VD);
             if (Results.end() == It) {
                 std::pair<ScopeAnalysis::UsageRefsMap::iterator, bool> R =
@@ -68,7 +68,7 @@ protected:
                 It = R.first;
             }
             ScopeAnalysis::UsageRefs & Ls = It->second;
-            Ls.push_back(ScopeAnalysis::UsageRef(U.Type, Stmt->getSourceRange()));
+            Ls.push_back(U.second);
         }
     }
 
