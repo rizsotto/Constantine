@@ -2,11 +2,9 @@
 
 #include "ScopeAnalysis.hpp"
 
-#include <algorithm>
-#include <functional>
-#include <iterator>
-
 #include <boost/bind.hpp>
+#include <boost/range.hpp>
+#include <boost/range/algorithm/for_each.hpp>
 
 #include <clang/AST/RecursiveASTVisitor.h>
 
@@ -71,6 +69,26 @@ protected:
             }
             ScopeAnalysis::UsageRefs & Ls = It->second;
             Ls.push_back(ScopeAnalysis::UsageRef(U.Type, Stmt->getSourceRange()));
+        }
+    }
+
+    void Report(char const * const Message, clang::DiagnosticsEngine & DE) const {
+        boost::for_each(Results,
+            boost::bind(UsageRefCollector::Report, _1, Message, boost::ref(DE)));
+    }
+
+private:
+    static
+    void Report( ScopeAnalysis::UsageRefsMap::value_type const & Var
+               , char const * const Message
+               , clang::DiagnosticsEngine & DE) {
+        unsigned const Id = DE.getCustomDiagID(clang::DiagnosticsEngine::Note, Message);
+        ScopeAnalysis::UsageRefs const & Ls = Var.second;
+        for (ScopeAnalysis::UsageRefs::const_iterator It(Ls.begin()), End(Ls.end()); It != End; ++It) {
+            clang::DiagnosticBuilder DB = DE.Report(It->second.getBegin(), Id);
+            DB << Var.first->getNameAsString();
+            DB << It->first.getAsString();
+            DB.setForceEmit();
         }
     }
 
@@ -150,6 +168,10 @@ public:
         }
         return true;
     }
+
+    void Report(clang::DiagnosticsEngine & DE) const {
+        UsageRefCollector::Report("variable '%0' with type '%1' was changed", DE);
+    }
 };
 
 // Collect all variables which were accessed in the given scope.
@@ -168,20 +190,11 @@ public:
         AddToResults(Stmt);
         return true;
     }
-};
 
-void Report( ScopeAnalysis::UsageRefsMap::value_type const & Var
-           , char const * const Message
-           , clang::DiagnosticsEngine & DE) {
-    unsigned const Id = DE.getCustomDiagID(clang::DiagnosticsEngine::Note, Message);
-    ScopeAnalysis::UsageRefs const & Ls = Var.second;
-    for (ScopeAnalysis::UsageRefs::const_iterator It(Ls.begin()), End(Ls.end()); It != End; ++It) {
-        clang::DiagnosticBuilder DB = DE.Report(It->second.getBegin(), Id);
-        DB << Var.first->getNameAsString();
-        DB << It->first.getAsString();
-        DB.setForceEmit();
+    void Report(clang::DiagnosticsEngine & DE) const {
+        UsageRefCollector::Report("variable '%0' was used", DE);
     }
-}
+};
 
 } // namespace anonymous
 
@@ -207,11 +220,17 @@ bool ScopeAnalysis::WasReferenced(clang::VarDecl const * const Decl) const {
 }
 
 void ScopeAnalysis::DebugChanged(clang::DiagnosticsEngine & DE) const {
-    std::for_each(Changed.begin(), Changed.end(),
-        boost::bind(Report, _1, "variable '%0' with type '%1' was changed", boost::ref(DE)));
+    ScopeAnalysis Copy = *this;
+    {
+        VariableChangeCollector const Visitor(Copy.Changed);
+        Visitor.Report(DE);
+    }
 }
 
 void ScopeAnalysis::DebugReferenced(clang::DiagnosticsEngine & DE) const {
-    std::for_each(Used.begin(), Used.end(),
-        boost::bind(Report, _1, "variable '%0' was used", boost::ref(DE)));
+    ScopeAnalysis Copy = *this;
+    {
+        VariableAccessCollector const Visitor(Copy.Used);
+        Visitor.Report(DE);
+    }
 }
