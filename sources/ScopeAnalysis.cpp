@@ -99,9 +99,9 @@ protected:
         }
     }
 
-    void Report(char const * const Message, clang::DiagnosticsEngine & DE) const {
+    void Report(char const * const M, clang::DiagnosticsEngine & DE) const {
         boost::for_each(Results,
-            boost::bind(UsageRefCollector::Report, _1, Message, boost::ref(DE)));
+            boost::bind(UsageRefCollector::Report, _1, M, boost::ref(DE)));
     }
 
 private:
@@ -133,12 +133,6 @@ public:
         : UsageRefCollector(Out)
         , clang::RecursiveASTVisitor<VariableChangeCollector>()
     { }
-
-protected:
-    // Register usage when passed as non const reference or pointer.
-    void AddToResultsWhenPassedAsNonConstReference(clang::Expr const * const Stmt) {
-        AddToResults(Stmt);
-    }
 
 public:
     // Assignments are mutating variables.
@@ -178,19 +172,12 @@ public:
         return true;
     }
 
-    // Variables potentially mutated when you pass by-pointer or by-reference.
-    bool VisitCallExpr(clang::CallExpr const * const Stmt) {
-        std::for_each(Stmt->arg_begin(), Stmt->arg_end(),
-            boost::bind(&VariableChangeCollector::AddToResultsWhenPassedAsNonConstReference, boost::ref(this), _1));
-        return true;
-    }
-
     // Variables are mutated if non-const member function called.
     bool VisitMemberExpr(clang::MemberExpr const * const Stmt) {
         clang::Type const * const T = Stmt->getMemberDecl()->getType().getCanonicalType().getTypePtr();
         if (clang::FunctionProtoType const * const F = T->getAs<clang::FunctionProtoType>()) {
             if (! (F->getTypeQuals() & clang::Qualifiers::Const) ) {
-                AddToResultsWhenPassedAsNonConstReference(Stmt);
+                AddToResults(Stmt);
             }
         }
         return true;
