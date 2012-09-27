@@ -31,13 +31,14 @@ public:
         return Result;
     }
 
-protected:
+private:
     UsageExtractor(Usage & In)
         : clang::RecursiveASTVisitor<UsageExtractor>()
         , Result(In)
     { }
 
 public:
+    // public visitor method.
     bool VisitDeclRefExpr(clang::DeclRefExpr const * const D) {
         if (clang::VarDecl const * const VD = clang::dyn_cast<clang::VarDecl const>(D->getDecl())) {
             Result.Variable = VD;
@@ -46,11 +47,12 @@ public:
         return true;
     }
 
-protected:
+private:
     Usage & Result;
 };
 
-// Collect named variables and do emit diagnostic messages for tests.
+// Collect variable usages. One variable could have been used multiple
+// times with different constness of the given type.
 class UsageRefCollector {
 public:
     UsageRefCollector(ScopeAnalysis::UsageRefsMap & Out)
@@ -58,14 +60,8 @@ public:
     { }
 
 protected:
-    void AddToResults(clang::Decl const * const D, clang::SourceRange const & L) {
-        UsageExtractor::Usage U =
-            { clang::dyn_cast<clang::VarDecl const>(D), clang::QualType() };
-
-        return AddToResults(U, L);
-    }
-
-    void AddToResults(UsageExtractor::Usage const & U, clang::SourceRange const & L) {
+    void AddToResults(clang::Expr const * const Stmt) {
+        UsageExtractor::Usage const & U = UsageExtractor::GetUsage(*Stmt);
         if (clang::VarDecl const * const VD = U.Variable) {
             ScopeAnalysis::UsageRefsMap::iterator It = Results.find(VD);
             if (Results.end() == It) {
@@ -74,7 +70,7 @@ protected:
                 It = R.first;
             }
             ScopeAnalysis::UsageRefs & Ls = It->second;
-            Ls.push_back(ScopeAnalysis::UsageRef(U.Type, L));
+            Ls.push_back(ScopeAnalysis::UsageRef(U.Type, Stmt->getSourceRange()));
         }
     }
 
@@ -93,11 +89,15 @@ public:
         , clang::RecursiveASTVisitor<VariableChangeCollector>()
     { }
 
+protected:
+    // Register usage when passed as non const reference or pointer.
+    void AddToResultsWhenPassedAsNonConstReference(clang::Expr const * const Stmt) {
+        AddToResults(Stmt);
+    }
+
+public:
     // Assignments are mutating variables.
     bool VisitBinaryOperator(clang::BinaryOperator const * const Stmt) {
-        UsageExtractor::Usage const & U =
-            UsageExtractor::GetUsage(*(Stmt->getLHS()));
-
         switch (Stmt->getOpcode()) {
         case clang::BO_Assign:
         case clang::BO_MulAssign:
@@ -110,7 +110,7 @@ public:
         case clang::BO_AndAssign:
         case clang::BO_XorAssign:
         case clang::BO_OrAssign:
-            AddToResults(U, Stmt->getSourceRange());
+            AddToResults(Stmt->getLHS());
             break;
         default:
             break;
@@ -120,15 +120,12 @@ public:
 
     // Some operator does mutate variables.
     bool VisitUnaryOperator(clang::UnaryOperator const * const Stmt) {
-        UsageExtractor::Usage const & U =
-            UsageExtractor::GetUsage(*(Stmt->getSubExpr()));
-
         switch (Stmt->getOpcode()) {
         case clang::UO_PostInc:
         case clang::UO_PostDec:
         case clang::UO_PreInc:
         case clang::UO_PreDec:
-            AddToResults(U, Stmt->getSourceRange());
+            AddToResults(Stmt->getSubExpr());
             break;
         default:
             break;
@@ -139,7 +136,7 @@ public:
     // Variables potentially mutated when you pass by-pointer or by-reference.
     bool VisitCallExpr(clang::CallExpr const * const Stmt) {
         std::for_each(Stmt->arg_begin(), Stmt->arg_end(),
-            boost::bind(&VariableChangeCollector::AddToResultsWhenReferedWithoutCast, boost::ref(this), _1));
+            boost::bind(&VariableChangeCollector::AddToResultsWhenPassedAsNonConstReference, boost::ref(this), _1));
         return true;
     }
 
@@ -148,80 +145,10 @@ public:
         clang::Type const * const T = Stmt->getMemberDecl()->getType().getCanonicalType().getTypePtr();
         if (clang::FunctionProtoType const * const F = T->getAs<clang::FunctionProtoType>()) {
             if (! (F->getTypeQuals() & clang::Qualifiers::Const) ) {
-                AddToResultsWhenReferedWithoutCast(Stmt);
+                AddToResultsWhenPassedAsNonConstReference(Stmt);
             }
         }
         return true;
-    }
-
-private:
-    /*** source looks like this ***
-        $ cat ../show.cpp
-
-        void by_pointer(int *) { }
-
-        void by_const_pointer(int const *) { }
-
-        void by_ref(int &) { }
-
-        void by_const_ref(int const &) { }
-
-        void by_value(int) { }
-
-        void test() {
-            int k = 0;
-            int * kptr = &k;
-
-            by_pointer(kptr);
-            by_const_pointer(kptr);
-            by_ref(k);
-            by_const_ref(k);
-            by_value(k);
-        }
-
-        *** AST looks like this ***
-        $ clang++ -cc1 -ast-dump ../show.cpp
-
-        void test() (CompoundStmt 0x40d3c48 <./show.cpp:12:13, line:21:1>
-          (DeclStmt 0x40d3558 <line:13:5, col:14>
-            0x40d34e0 "int k =
-              (IntegerLiteral 0x40d3538 <col:13> 'int' 0)")
-          (DeclStmt 0x40d3630 <line:14:5, col:20>
-            0x40d3590 "int *kptr =
-              (UnaryOperator 0x40d3610 <col:18, col:19> 'int *' prefix '&'
-                (DeclRefExpr 0x40d35e8 <col:19> 'int' lvalue Var 0x40d34e0 'k' 'int'))")
-          (CallExpr 0x40d3730 <line:16:5, col:20> 'void'
-            (ImplicitCastExpr 0x40d3718 <col:5> 'void (*)(int *)' <FunctionToPointerDecay>
-              (DeclRefExpr 0x40d36c8 <col:5> 'void (int *)' lvalue Function 0x40a6ca0 'by_pointer' 'void (int *)'))
-            (ImplicitCastExpr 0x40d3760 <col:16> 'int *' <LValueToRValue>
-              (DeclRefExpr 0x40d36a0 <col:16> 'int *' lvalue Var 0x40d3590 'kptr' 'int *')))
-          (CallExpr 0x40d3860 <line:17:5, col:26> 'void'
-            (ImplicitCastExpr 0x40d3848 <col:5> 'void (*)(const int *)' <FunctionToPointerDecay>
-              (DeclRefExpr 0x40d37f8 <col:5> 'void (const int *)' lvalue Function 0x40d2e10 'by_const_pointer' 'void (const int *)'))
-            (ImplicitCastExpr 0x40d38a8 <col:22> 'const int *' <NoOp>
-              (ImplicitCastExpr 0x40d3890 <col:22> 'int *' <LValueToRValue>
-                (DeclRefExpr 0x40d37d0 <col:22> 'int *' lvalue Var 0x40d3590 'kptr' 'int *'))))
-          (CallExpr 0x40d39b0 <line:18:5, col:13> 'void'
-            (ImplicitCastExpr 0x40d3998 <col:5> 'void (*)(int &)' <FunctionToPointerDecay>
-              (DeclRefExpr 0x40d3940 <col:5> 'void (int &)' lvalue Function 0x40d2fd0 'by_ref' 'void (int &)'))
-            (DeclRefExpr 0x40d3918 <col:12> 'int' lvalue Var 0x40d34e0 'k' 'int'))
-          (CallExpr 0x40d3ad0 <line:19:5, col:19> 'void'
-            (ImplicitCastExpr 0x40d3ab8 <col:5> 'void (*)(const int &)' <FunctionToPointerDecay>
-              (DeclRefExpr 0x40d3a60 <col:5> 'void (const int &)' lvalue Function 0x40d3190 'by_const_ref' 'void (const int &)'))
-            (ImplicitCastExpr 0x40d3b00 <col:18> 'const int' lvalue <NoOp>
-              (DeclRefExpr 0x40d3a38 <col:18> 'int' lvalue Var 0x40d34e0 'k' 'int')))
-          (CallExpr 0x40d3c00 <line:20:5, col:15> 'void'
-            (ImplicitCastExpr 0x40d3be8 <col:5> 'void (*)(int)' <FunctionToPointerDecay>
-              (DeclRefExpr 0x40d3b98 <col:5> 'void (int)' lvalue Function 0x40d3320 'by_value' 'void (int)'))
-            (ImplicitCastExpr 0x40d3c30 <col:14> 'int' <LValueToRValue>
-              (DeclRefExpr 0x40d3b70 <col:14> 'int' lvalue Var 0x40d34e0 'k' 'int'))))
-     */
-    inline
-    void AddToResultsWhenReferedWithoutCast(clang::Expr const * const Stmt) {
-        UsageExtractor::Usage const & U =
-            UsageExtractor::GetUsage(*(Stmt));
-
-        AddToResults(U, Stmt->getSourceRange());
     }
 };
 
@@ -238,13 +165,7 @@ public:
 
     // Variable access is a usage of the variable.
     bool VisitDeclRefExpr(clang::DeclRefExpr const * const Stmt) {
-        AddToResults(Stmt->getDecl(), Stmt->getSourceRange());
-        return true;
-    }
-
-    // Member access is a usage of the class.
-    bool VisitMemberExpr(clang::MemberExpr const * const Stmt) {
-        AddToResults(Stmt->getMemberDecl(), Stmt->getSourceRange());
+        AddToResults(Stmt);
         return true;
     }
 };
