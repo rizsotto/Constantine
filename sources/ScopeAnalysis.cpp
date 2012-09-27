@@ -35,12 +35,39 @@ private:
         , Result(In)
     { }
 
+    void SetType(clang::QualType const & In) {
+        static clang::QualType Empty = clang::QualType();
+
+        clang::QualType & Current = Result.second.first;
+        if (Empty == Current) {
+            Current = In;
+        }
+    }
+
+    void SetVariable(clang::Decl const * const Decl) {
+        if (clang::VarDecl const * const VD =
+                clang::dyn_cast<clang::VarDecl const>(Decl))
+            Result.first = VD;
+    }
+
 public:
     // public visitor method.
-    bool VisitDeclRefExpr(clang::DeclRefExpr const * const D) {
-        if (clang::VarDecl const * const VD = clang::dyn_cast<clang::VarDecl const>(D->getDecl())) {
-            Result.first = VD;
-            Result.second.first = D->getType();
+    bool VisitDeclRefExpr(clang::DeclRefExpr const * const Expr) {
+        SetVariable(Expr->getDecl());
+        SetType(Expr->getType());
+        return true;
+    }
+
+    bool VisitCastExpr(clang::CastExpr const * const Expr) {
+        SetType(Expr->getType());
+        return true;
+    }
+
+    bool VisitUnaryOperator(clang::UnaryOperator const * const Expr) {
+        switch (Expr->getOpcode()) {
+        case clang::UO_AddrOf:
+        case clang::UO_Deref:
+            SetType(Expr->getType());
         }
         return true;
     }
