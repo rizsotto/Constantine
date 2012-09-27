@@ -12,40 +12,42 @@
 
 namespace {
 
-// Declaration extract method implemented in visitor style.
-class DeclarationCollector
-    : public clang::RecursiveASTVisitor<DeclarationCollector> {
+// Usage extract method implemented in visitor style.
+class UsageExtractor
+    : public clang::RecursiveASTVisitor<UsageExtractor> {
 public:
-    typedef std::pair<clang::VarDecl const *, clang::QualType> UsageRef;
+    // Represents the used variable and the type of usage.
+    struct Usage {
+        clang::VarDecl const * Variable;
+        clang::QualType Type;
+    };
 
-    static UsageRef GetDeclaration(clang::Stmt const & Stmt) {
-        UsageRef Result(0, clang::QualType());
+    static Usage GetUsage(clang::Stmt const & Stmt) {
+        Usage Result = { 0, clang::QualType() };
         {
-            DeclarationCollector Visitor(Result);
+            UsageExtractor Visitor(Result);
             Visitor.TraverseStmt(const_cast<clang::Stmt*>(&Stmt));
         }
         return Result;
     }
 
 protected:
-    DeclarationCollector(UsageRef & In)
-        : clang::RecursiveASTVisitor<DeclarationCollector>()
+    UsageExtractor(Usage & In)
+        : clang::RecursiveASTVisitor<UsageExtractor>()
         , Result(In)
     { }
 
 public:
     bool VisitDeclRefExpr(clang::DeclRefExpr const * const D) {
-        static clang::QualType const EmptyType = clang::QualType();
-
         if (clang::VarDecl const * const VD = clang::dyn_cast<clang::VarDecl const>(D->getDecl())) {
-            Result.first = VD;
-            Result.second = D->getType();
+            Result.Variable = VD;
+            Result.Type = D->getType();
         }
         return true;
     }
 
 protected:
-    UsageRef & Result;
+    Usage & Result;
 };
 
 // Collect named variables and do emit diagnostic messages for tests.
@@ -57,14 +59,14 @@ public:
 
 protected:
     void AddToResults(clang::Decl const * const D, clang::SourceRange const & L) {
-        DeclarationCollector::UsageRef
-            U(clang::dyn_cast<clang::VarDecl const>(D), clang::QualType());
+        UsageExtractor::Usage U =
+            { clang::dyn_cast<clang::VarDecl const>(D), clang::QualType() };
 
         return AddToResults(U, L);
     }
 
-    void AddToResults(DeclarationCollector::UsageRef const & U, clang::SourceRange const & L) {
-        if (clang::VarDecl const * const VD = U.first) {
+    void AddToResults(UsageExtractor::Usage const & U, clang::SourceRange const & L) {
+        if (clang::VarDecl const * const VD = U.Variable) {
             ScopeAnalysis::UsageRefsMap::iterator It = Results.find(VD);
             if (Results.end() == It) {
                 std::pair<ScopeAnalysis::UsageRefsMap::iterator, bool> R =
@@ -72,7 +74,7 @@ protected:
                 It = R.first;
             }
             ScopeAnalysis::UsageRefs & Ls = It->second;
-            Ls.push_back(ScopeAnalysis::UsageRef(U.second, L));
+            Ls.push_back(ScopeAnalysis::UsageRef(U.Type, L));
         }
     }
 
@@ -93,8 +95,8 @@ public:
 
     // Assignments are mutating variables.
     bool VisitBinaryOperator(clang::BinaryOperator const * const Stmt) {
-        DeclarationCollector::UsageRef const & U =
-            DeclarationCollector::GetDeclaration(*(Stmt->getLHS()));
+        UsageExtractor::Usage const & U =
+            UsageExtractor::GetUsage(*(Stmt->getLHS()));
 
         switch (Stmt->getOpcode()) {
         case clang::BO_Assign:
@@ -118,8 +120,8 @@ public:
 
     // Some operator does mutate variables.
     bool VisitUnaryOperator(clang::UnaryOperator const * const Stmt) {
-        DeclarationCollector::UsageRef const & U =
-            DeclarationCollector::GetDeclaration(*(Stmt->getSubExpr()));
+        UsageExtractor::Usage const & U =
+            UsageExtractor::GetUsage(*(Stmt->getSubExpr()));
 
         switch (Stmt->getOpcode()) {
         case clang::UO_PostInc:
@@ -216,8 +218,8 @@ private:
      */
     inline
     void AddToResultsWhenReferedWithoutCast(clang::Expr const * const Stmt) {
-        DeclarationCollector::UsageRef const & U =
-            DeclarationCollector::GetDeclaration(*(Stmt));
+        UsageExtractor::Usage const & U =
+            UsageExtractor::GetUsage(*(Stmt));
 
         AddToResults(U, Stmt->getSourceRange());
     }
