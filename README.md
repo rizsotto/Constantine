@@ -6,15 +6,15 @@ Medve is a toy project to learn how to write clang plugin.
 Implemented functionalities
 ---------------------------
 
-* Currently implemented const analysis for basic types.
+* Implement pseudo const analysis.
 
 Prerequisites
 -------------
 
-You need a copy of the clang 3.1 compiler. Or a newer from SVN.
-Description for that you can find from [clang getting started][1].
+Clang 3.1 or a newer from SVN. Description for that you can find
+from [clang getting started][1].
 
-r157581 (from trunk) is known to be working. (Mon, 28 May 2012)
+r164964 (from trunk) is known to be working. (Mon,  1 Oct 2012)
 
 How to build
 ------------
