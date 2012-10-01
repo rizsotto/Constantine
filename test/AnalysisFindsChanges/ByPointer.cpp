@@ -21,6 +21,8 @@ void binary_operators() {
 
     *iptr = 0; // expected-note {{variable 'iptr' with type 'int' was changed}}
     iptr = 0; // expected-note {{variable 'iptr' with type 'int *' was changed}}
+    *(&i) = 1; // expected-note {{variable 'i' with type 'int' was changed}}
+
     *iptr *= 1; // expected-note {{variable 'iptr' with type 'int' was changed}}
     *iptr /= 1; // expected-note {{variable 'iptr' with type 'int' was changed}}
     *iptr %= 2; // expected-note {{variable 'iptr' with type 'int' was changed}}
