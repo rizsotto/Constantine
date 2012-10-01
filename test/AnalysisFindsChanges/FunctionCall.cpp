@@ -26,7 +26,7 @@ void function_call_test() {
     inc_p(&i); // expected-note {{variable 'i' with type 'int' was changed}}
     inc_const_p(&i);
 
-    int iref = i;
+    int & iref = i;
 
     inc(iref);
     inc_ref(iref); // expected-note {{variable 'iref' with type 'int' was changed}}

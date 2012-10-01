@@ -17,9 +17,10 @@ void unary_operators() {
 
 void binary_operators() {
     int i = 0;
-    int * const iptr = &i;
+    int * iptr = &i;
 
-    *iptr = 1; // expected-note {{variable 'iptr' with type 'int' was changed}}
+    *iptr = 0; // expected-note {{variable 'iptr' with type 'int' was changed}}
+    iptr = 0; // expected-note {{variable 'iptr' with type 'int *' was changed}}
     *iptr *= 1; // expected-note {{variable 'iptr' with type 'int' was changed}}
     *iptr /= 1; // expected-note {{variable 'iptr' with type 'int' was changed}}
     *iptr %= 2; // expected-note {{variable 'iptr' with type 'int' was changed}}

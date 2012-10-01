@@ -87,6 +87,10 @@ public:
 protected:
     void AddToResults(clang::Expr const * const Stmt) {
         UsageExtractor::Usage const & U = UsageExtractor::GetUsage(*Stmt);
+        return AddToResults(U);
+    }
+
+    void AddToResults(UsageExtractor::Usage const & U) {
         if (clang::VarDecl const * const VD = U.first) {
             ScopeAnalysis::UsageRefsMap::iterator It = Results.find(VD);
             if (Results.end() == It) {
@@ -181,6 +185,31 @@ public:
             }
         }
         return true;
+    }
+
+    // Arguments potentially mutated when you pass by-pointer or by-reference.
+    bool VisitCallExpr(clang::CallExpr const * const Stmt) {
+        if (clang::FunctionDecl const * const F = Stmt->getDirectCallee()) {
+            // check the function parameters one by one
+            int const Args = std::min(Stmt->getNumArgs(), F->getNumParams());
+            for (int It = 0; It < Args; ++It) {
+                clang::ParmVarDecl const * const P = F->getParamDecl(It);
+                UsageExtractor::Usage U = UsageExtractor::GetUsage( *(Stmt->getArg(It)) );
+                if (IsNonConstReferenced(P->getType())) {
+                    // change the usage type to the refered type of the
+                    // parameter declaration.
+                    U.second.first = (*(P->getType())).getPointeeType();
+                    AddToResults(U);
+                }
+            }
+        }
+        return true;
+    }
+
+    static bool IsNonConstReferenced(clang::QualType const & Decl) {
+        return
+            ((*Decl).isReferenceType() || (*Decl).isPointerType())
+            && (! (*Decl).getPointeeType().isConstQualified());
     }
 
     void Report(clang::DiagnosticsEngine & DE) const {
