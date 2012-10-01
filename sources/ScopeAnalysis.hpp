@@ -14,8 +14,9 @@
 // if they are never written to, implying that they constant.
 class ScopeAnalysis {
 public:
-    typedef std::list<clang::SourceRange>  Locations;
-    typedef std::map<clang::VarDecl const *, Locations> Variables;
+    typedef std::pair<clang::QualType, clang::SourceRange> UsageRef;
+    typedef std::list<UsageRef> UsageRefs;
+    typedef std::map<clang::VarDecl const *, UsageRefs> UsageRefsMap;
 
 public:
     static ScopeAnalysis AnalyseThis(clang::Stmt const &);
@@ -27,8 +28,8 @@ public:
     void DebugReferenced(clang::DiagnosticsEngine &) const;
 
 private:
-    Variables Changed;
-    Variables Used;
+    UsageRefsMap Changed;
+    UsageRefsMap Used;
 };
 
 #endif // _ScopeAnalysis_hpp_
