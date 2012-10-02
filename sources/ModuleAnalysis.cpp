@@ -97,10 +97,9 @@ struct FunctionWrapper : public boost::noncopyable {
 protected:
     virtual clang::FunctionDecl const * GetFunctionDecl() const = 0;
 
-    typedef std::set<clang::VarDecl const *> VarDeclSet;
-    virtual VarDeclSet GetArguments() const = 0;
-    virtual VarDeclSet GetLocals() const = 0;
-    virtual VarDeclSet GetMembers() const = 0;
+    virtual Variables GetArguments() const = 0;
+    virtual Variables GetLocals() const = 0;
+    virtual Variables GetMembers() const = 0;
 
 public:
     // Debug functionality
@@ -176,27 +175,27 @@ protected:
         return Function;
     }
 
-    VarDeclSet GetArguments() const {
-        VarDeclSet Result;
+    Variables GetArguments() const {
+        Variables Result;
         boost::copy(
             boost::make_iterator_range(Function->param_begin(), Function->param_end()),
-            std::insert_iterator<VarDeclSet>(Result, Result.begin()));
+            std::insert_iterator<Variables>(Result, Result.begin()));
         return Result;
     }
 
-    VarDeclSet GetLocals() const {
-        VarDeclSet Result;
+    Variables GetLocals() const {
+        Variables Result;
         boost::transform(
               boost::make_iterator_range(Function->decls_begin(), Function->decls_end())
-            , std::insert_iterator<VarDeclSet>(Result, Result.begin())
+            , std::insert_iterator<Variables>(Result, Result.begin())
             , &FunctionDeclWrapper::CastVarDecl
         );
         Result.erase(0);
         return Result;
     }
 
-    VarDeclSet GetMembers() const {
-        return VarDeclSet();
+    Variables GetMembers() const {
+        return Variables();
     }
 
 private:
