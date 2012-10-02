@@ -97,9 +97,7 @@ struct FunctionWrapper : public boost::noncopyable {
 protected:
     virtual clang::FunctionDecl const * GetFunctionDecl() const = 0;
 
-    virtual Variables GetArguments() const = 0;
-    virtual Variables GetLocals() const = 0;
-    virtual Variables GetMembers() const = 0;
+    virtual Variables GetVariables() const = 0;
 
 public:
     // Debug functionality
@@ -118,11 +116,7 @@ void FunctionWrapper::DumpFuncionDeclaration(clang::DiagnosticsEngine & DE) cons
 }
 
 void FunctionWrapper::DumpVariableDeclaration(clang::DiagnosticsEngine & DE) const {
-    boost::for_each(GetArguments(),
-        boost::bind(ReportVariableDeclaration, boost::ref(DE), _1));
-    boost::for_each(GetLocals(),
-        boost::bind(ReportVariableDeclaration, boost::ref(DE), _1));
-    boost::for_each(GetMembers(),
+    boost::for_each(GetVariables(),
         boost::bind(ReportVariableDeclaration, boost::ref(DE), _1));
 }
 
@@ -142,11 +136,7 @@ void FunctionWrapper::CheckPseudoConstness(PseudoConstnessAnalysisState & State)
     clang::FunctionDecl const * F = GetFunctionDecl();
     ScopeAnalysis const & Analysis = ScopeAnalysis::AnalyseThis(*(F->getBody()));
 
-    boost::for_each(GetArguments(),
-        boost::bind(&PseudoConstnessAnalysisState::Eval, &State, boost::cref(Analysis), _1));
-    boost::for_each(GetLocals(),
-        boost::bind(&PseudoConstnessAnalysisState::Eval, &State, boost::cref(Analysis), _1));
-    boost::for_each(GetMembers(),
+    boost::for_each(GetVariables(),
         boost::bind(&PseudoConstnessAnalysisState::Eval, &State, boost::cref(Analysis), _1));
 }
 
@@ -160,30 +150,14 @@ public:
 
 protected:
     static clang::VarDecl const * CastVarDecl(clang::Decl const * const Decl) {
-        clang::VarDecl const * const Candidate =
-            clang::dyn_cast<clang::VarDecl const>(Decl);
-
-        return
-            (   (0 != Candidate)
-            &&  (0 == clang::dyn_cast<clang::ParmVarDecl const>(Candidate))
-            )
-                ? Candidate
-                : 0;
+        return clang::dyn_cast<clang::VarDecl const>(Decl);
     }
 
     clang::FunctionDecl const * GetFunctionDecl() const {
         return Function;
     }
 
-    Variables GetArguments() const {
-        Variables Result;
-        boost::copy(
-            boost::make_iterator_range(Function->param_begin(), Function->param_end()),
-            std::insert_iterator<Variables>(Result, Result.begin()));
-        return Result;
-    }
-
-    Variables GetLocals() const {
+    Variables GetVariables() const {
         Variables Result;
         boost::transform(
               boost::make_iterator_range(Function->decls_begin(), Function->decls_end())
@@ -192,10 +166,6 @@ protected:
         );
         Result.erase(0);
         return Result;
-    }
-
-    Variables GetMembers() const {
-        return Variables();
     }
 
 private:
