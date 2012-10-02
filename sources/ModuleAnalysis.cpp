@@ -105,9 +105,7 @@ protected:
 public:
     // Debug functionality
     virtual void DumpFuncionDeclaration(clang::DiagnosticsEngine &) const;
-    virtual void DumpArguments(clang::DiagnosticsEngine &) const;
-    virtual void DumpLocalVariables(clang::DiagnosticsEngine &) const;
-    virtual void DumpMemberVariables(clang::DiagnosticsEngine &) const;
+    virtual void DumpVariableDeclaration(clang::DiagnosticsEngine &) const;
 
     // Analysis functionality
     virtual void DumpVariableChanges(clang::DiagnosticsEngine &) const;
@@ -120,17 +118,11 @@ void FunctionWrapper::DumpFuncionDeclaration(clang::DiagnosticsEngine & DE) cons
     ReportFunctionDeclaration(DE, F);
 }
 
-void FunctionWrapper::DumpArguments(clang::DiagnosticsEngine & DE) const {
+void FunctionWrapper::DumpVariableDeclaration(clang::DiagnosticsEngine & DE) const {
     boost::for_each(GetArguments(),
         boost::bind(ReportVariableDeclaration, boost::ref(DE), _1));
-}
-
-void FunctionWrapper::DumpLocalVariables(clang::DiagnosticsEngine & DE) const {
     boost::for_each(GetLocals(),
         boost::bind(ReportVariableDeclaration, boost::ref(DE), _1));
-}
-
-void FunctionWrapper::DumpMemberVariables(clang::DiagnosticsEngine & DE) const {
     boost::for_each(GetMembers(),
         boost::bind(ReportVariableDeclaration, boost::ref(DE), _1));
 }
@@ -220,19 +212,9 @@ public:
             boost::bind(&FunctionWrapper::DumpFuncionDeclaration, _1, boost::ref(DE)));
     }
 
-    void DumpArguments(clang::DiagnosticsEngine & DE) const {
+    void DumpVariableDeclaration(clang::DiagnosticsEngine & DE) const {
         boost::for_each(Functions | boost::adaptors::map_values,
-            boost::bind(&FunctionWrapper::DumpArguments, _1, boost::ref(DE)));
-    }
-
-    void DumpLocalVariables(clang::DiagnosticsEngine & DE) const {
-        boost::for_each(Functions | boost::adaptors::map_values,
-            boost::bind(&FunctionWrapper::DumpLocalVariables, _1, boost::ref(DE)));
-    }
-
-    void DumpMemberVariables(clang::DiagnosticsEngine & DE) const {
-        boost::for_each(Functions | boost::adaptors::map_values,
-            boost::bind(&FunctionWrapper::DumpMemberVariables, _1, boost::ref(DE)));
+            boost::bind(&FunctionWrapper::DumpVariableDeclaration, _1, boost::ref(DE)));
     }
 
     void DumpVariableChanges(clang::DiagnosticsEngine & DE) const {
@@ -252,7 +234,7 @@ public:
         State.GenerateReports(DE);
     }
 
-    // this is for visitor pattern
+    // public visitor method.
     bool VisitFunctionDecl(clang::FunctionDecl const * F) {
         clang::FunctionDecl const * const CD = F->getCanonicalDecl();
         if (F->isThisDeclarationADefinition()) {
@@ -288,14 +270,8 @@ void ModuleAnalysis::HandleTranslationUnit(clang::ASTContext & Ctx) {
     case FuncionDeclaration :
         Collector.DumpFuncionDeclaration(Reporter);
         break;
-    case Arguments :
-        Collector.DumpArguments(Reporter);
-        break;
-    case LocalVariables :
-        Collector.DumpLocalVariables(Reporter);
-        break;
-    case MemberVariables :
-        Collector.DumpMemberVariables(Reporter);
+    case VariableDeclaration :
+        Collector.DumpVariableDeclaration(Reporter);
         break;
     case VariableChanges :
         Collector.DumpVariableChanges(Reporter);

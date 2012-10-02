@@ -1,4 +1,4 @@
-// RUN: %clang_cc1 %show_local_variables %s -fsyntax-only -verify
+// RUN: %clang_cc1 %show_variables %s -fsyntax-only -verify
 
 class A {
 
@@ -7,7 +7,7 @@ class A {
 
     A();
 
-    void f1(int) const;
+    void f1() const;
 };
 
 A::A()
@@ -17,6 +17,6 @@ A::A()
     int k = m_i; // expected-note {{variable 'k' declared here}}
 }
 
-void A::f1(int a) const {
+void A::f1() const {
     int k = m_i; // expected-note {{variable 'k' declared here}}
 }

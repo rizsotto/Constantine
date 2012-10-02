@@ -1,4 +1,4 @@
-// RUN: %clang_cc1 %show_arguments %s -fsyntax-only -verify
+// RUN: %clang_cc1 %show_variables %s -fsyntax-only -verify
 
 void f1() {
 }
