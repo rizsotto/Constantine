@@ -45,12 +45,14 @@ private:
     }
 
     void SetVariable(clang::Decl const * const Decl) {
+        clang::DeclaratorDecl const * & Current = Result.first;
+
         if (clang::DeclaratorDecl const * const VD =
                 clang::dyn_cast<clang::VarDecl const>(Decl)) {
-            Result.first = VD;
+            Current = VD;
         } else if (clang::DeclaratorDecl const * const VD =
                 clang::dyn_cast<clang::FieldDecl const>(Decl)) {
-            Result.first = VD;
+            Current = VD;
         }
     }
 
@@ -145,37 +147,16 @@ public:
 public:
     // Assignments are mutating variables.
     bool VisitBinaryOperator(clang::BinaryOperator const * const Stmt) {
-        switch (Stmt->getOpcode()) {
-        case clang::BO_Assign:
-        case clang::BO_MulAssign:
-        case clang::BO_DivAssign:
-        case clang::BO_RemAssign:
-        case clang::BO_AddAssign:
-        case clang::BO_SubAssign:
-        case clang::BO_ShlAssign:
-        case clang::BO_ShrAssign:
-        case clang::BO_AndAssign:
-        case clang::BO_XorAssign:
-        case clang::BO_OrAssign:
+        if (Stmt->isAssignmentOp()) {
             AddToResults(Stmt->getLHS());
-            break;
-        default:
-            break;
         }
         return true;
     }
 
-    // Some operator does mutate variables.
+    // Inc/Dec-rement operator does mutate variables.
     bool VisitUnaryOperator(clang::UnaryOperator const * const Stmt) {
-        switch (Stmt->getOpcode()) {
-        case clang::UO_PostInc:
-        case clang::UO_PostDec:
-        case clang::UO_PreInc:
-        case clang::UO_PreDec:
+        if (Stmt->isIncrementDecrementOp()) {
             AddToResults(Stmt->getSubExpr());
-            break;
-        default:
-            break;
         }
         return true;
     }
@@ -198,10 +179,11 @@ public:
             int const Args = std::min(Stmt->getNumArgs(), F->getNumParams());
             for (int It = 0; It < Args; ++It) {
                 clang::ParmVarDecl const * const P = F->getParamDecl(It);
-                UsageExtractor::Usage U = UsageExtractor::GetUsage( *(Stmt->getArg(It)) );
                 if (IsNonConstReferenced(P->getType())) {
-                    // change the usage type to the refered type of the
-                    // parameter declaration.
+                    // same as AddToResults(*(Stmt->getArg(It))), but..
+                    UsageExtractor::Usage U =
+                        UsageExtractor::GetUsage( *(Stmt->getArg(It)) );
+                    // change the usage type to the parameter declaration.
                     U.second.first = (*(P->getType())).getPointeeType();
                     AddToResults(U);
                 }
