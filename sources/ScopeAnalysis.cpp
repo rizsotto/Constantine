@@ -15,7 +15,7 @@ class UsageExtractor
     : public clang::RecursiveASTVisitor<UsageExtractor> {
 public:
     typedef ScopeAnalysis::UsageRef UsageRef;
-    typedef std::pair<clang::VarDecl const *, UsageRef> Usage;
+    typedef std::pair<clang::DeclaratorDecl const *, UsageRef> Usage;
 
     static Usage GetUsage(clang::Expr const & Expr) {
         Usage Result;
@@ -45,9 +45,13 @@ private:
     }
 
     void SetVariable(clang::Decl const * const Decl) {
-        if (clang::VarDecl const * const VD =
-                clang::dyn_cast<clang::VarDecl const>(Decl))
+        if (clang::DeclaratorDecl const * const VD =
+                clang::dyn_cast<clang::VarDecl const>(Decl)) {
             Result.first = VD;
+        } else if (clang::DeclaratorDecl const * const VD =
+                clang::dyn_cast<clang::FieldDecl const>(Decl)) {
+            Result.first = VD;
+        }
     }
 
 public:
@@ -91,7 +95,7 @@ protected:
     }
 
     void AddToResults(UsageExtractor::Usage const & U) {
-        if (clang::VarDecl const * const VD = U.first) {
+        if (clang::DeclaratorDecl const * const VD = U.first) {
             ScopeAnalysis::UsageRefsMap::iterator It = Results.find(VD);
             if (Results.end() == It) {
                 std::pair<ScopeAnalysis::UsageRefsMap::iterator, bool> R =
@@ -228,7 +232,6 @@ public:
         , clang::RecursiveASTVisitor<VariableAccessCollector>()
     { }
 
-    // Variable access is a usage of the variable.
     bool VisitDeclRefExpr(clang::DeclRefExpr const * const Stmt) {
         AddToResults(Stmt);
         return true;
@@ -254,11 +257,11 @@ ScopeAnalysis ScopeAnalysis::AnalyseThis(clang::Stmt const & Stmt) {
     return Result;
 }
 
-bool ScopeAnalysis::WasChanged(clang::VarDecl const * const Decl) const {
+bool ScopeAnalysis::WasChanged(clang::DeclaratorDecl const * const Decl) const {
     return (Changed.end() != Changed.find(Decl));
 }
 
-bool ScopeAnalysis::WasReferenced(clang::VarDecl const * const Decl) const {
+bool ScopeAnalysis::WasReferenced(clang::DeclaratorDecl const * const Decl) const {
     return (Used.end() != Used.find(Decl));
 }
 

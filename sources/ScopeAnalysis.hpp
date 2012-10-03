@@ -16,13 +16,13 @@ class ScopeAnalysis {
 public:
     typedef std::pair<clang::QualType, clang::SourceRange> UsageRef;
     typedef std::list<UsageRef> UsageRefs;
-    typedef std::map<clang::VarDecl const *, UsageRefs> UsageRefsMap;
+    typedef std::map<clang::DeclaratorDecl const *, UsageRefs> UsageRefsMap;
 
 public:
     static ScopeAnalysis AnalyseThis(clang::Stmt const &);
 
-    bool WasChanged(clang::VarDecl const *) const;
-    bool WasReferenced(clang::VarDecl const *) const;
+    bool WasChanged(clang::DeclaratorDecl const *) const;
+    bool WasReferenced(clang::DeclaratorDecl const *) const;
 
     void DebugChanged(clang::DiagnosticsEngine &) const;
     void DebugReferenced(clang::DiagnosticsEngine &) const;
