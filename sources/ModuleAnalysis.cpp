@@ -22,7 +22,7 @@
 namespace {
 
 // Report function for pseudo constness analysis.
-void ReportVariablePseudoConstness(clang::DiagnosticsEngine & DE, clang::VarDecl const * const V) {
+void ReportVariablePseudoConstness(clang::DiagnosticsEngine & DE, clang::DeclaratorDecl const * const V) {
     static char const * const Message = "variable '%0' could be declared as const";
     unsigned const Id = DE.getCustomDiagID(clang::DiagnosticsEngine::Warning, Message);
     clang::DiagnosticBuilder DB = DE.Report(V->getLocStart(), Id);
@@ -30,7 +30,7 @@ void ReportVariablePseudoConstness(clang::DiagnosticsEngine & DE, clang::VarDecl
 }
 
 // Report function for debug functionality.
-void ReportVariableDeclaration(clang::DiagnosticsEngine & DE, clang::VarDecl const * const V) {
+void ReportVariableDeclaration(clang::DiagnosticsEngine & DE, clang::DeclaratorDecl const * const V) {
     static char const * const Message = "variable '%0' declared here";
     unsigned const Id = DE.getCustomDiagID(clang::DiagnosticsEngine::Note, Message);
     clang::DiagnosticBuilder DB = DE.Report(V->getLocStart(), Id);
@@ -47,7 +47,7 @@ void ReportFunctionDeclaration(clang::DiagnosticsEngine & DE, clang::FunctionDec
 }
 
 
-typedef std::set<clang::VarDecl const *> Variables;
+typedef std::set<clang::DeclaratorDecl const *> Variables;
 
 
 // Pseudo constness analysis detects what variable can be declare as const.
@@ -61,7 +61,7 @@ public:
         , Changed()
     { }
 
-    void Eval(ScopeAnalysis const & Analysis, clang::VarDecl const * const V) {
+    void Eval(ScopeAnalysis const & Analysis, clang::DeclaratorDecl const * const V) {
         if (Analysis.WasChanged(V)) {
             Candidates.erase(V);
             Changed.insert(V);
@@ -80,7 +80,7 @@ public:
     }
 
 private:
-    static bool IsConst(clang::VarDecl const & D) {
+    static bool IsConst(clang::DeclaratorDecl const & D) {
         return (D.getType().getNonReferenceType().isConstQualified());
     }
 
@@ -140,6 +140,26 @@ void FunctionWrapper::CheckPseudoConstness(PseudoConstnessAnalysisState & State)
         boost::bind(&PseudoConstnessAnalysisState::Eval, &State, boost::cref(Analysis), _1));
 }
 
+Variables GetVariablesFromContext(clang::DeclContext const * const F) {
+    Variables Result;
+    for (clang::DeclContext::decl_iterator It(F->decls_begin()), End(F->decls_end()); It != End; ++It ) {
+        if (clang::VarDecl const * const D = clang::dyn_cast<clang::VarDecl const>(*It)) {
+            Result.insert(D);
+        }
+    }
+    return Result;
+}
+
+Variables GetVariablesFromRecord(clang::RecordDecl const * const F) {
+    Variables Result;
+    for (clang::RecordDecl::field_iterator It(F->field_begin()), End(F->field_end()); It != End; ++It ) {
+        if (clang::FieldDecl const * const D = clang::dyn_cast<clang::FieldDecl const>(*It)) {
+            Result.insert(D);
+        }
+    }
+    return Result;
+}
+
 // Implement wrapper for simple C functions.
 class FunctionDeclWrapper : public FunctionWrapper {
 public:
@@ -149,27 +169,42 @@ public:
     { }
 
 protected:
-    static clang::VarDecl const * CastVarDecl(clang::Decl const * const Decl) {
-        return clang::dyn_cast<clang::VarDecl const>(Decl);
+    clang::FunctionDecl const * GetFunctionDecl() const {
+        return Function;
     }
 
+    Variables GetVariables() const {
+        return GetVariablesFromContext(Function);
+    }
+
+private:
+    clang::FunctionDecl const * const Function;
+};
+
+// Implement wrapper for C++ methods.
+class MethodDeclWrapper : public FunctionWrapper {
+public:
+    MethodDeclWrapper(clang::CXXMethodDecl const * const F)
+        : FunctionWrapper()
+        , Function(F)
+    { }
+
+protected:
     clang::FunctionDecl const * GetFunctionDecl() const {
         return Function;
     }
 
     Variables GetVariables() const {
         Variables Result;
-        boost::transform(
-              boost::make_iterator_range(Function->decls_begin(), Function->decls_end())
-            , std::insert_iterator<Variables>(Result, Result.begin())
-            , &FunctionDeclWrapper::CastVarDecl
-        );
-        Result.erase(0);
+        boost::copy(GetVariablesFromContext(Function)
+            , std::insert_iterator<Variables>(Result, Result.begin()));
+        boost::copy(GetVariablesFromRecord(Function->getParent()->getCanonicalDecl())
+            , std::insert_iterator<Variables>(Result, Result.begin()));
         return Result;
     }
 
 private:
-    clang::FunctionDecl const * const Function;
+    clang::CXXMethodDecl const * const Function;
 };
 
 
@@ -207,9 +242,15 @@ public:
     bool VisitFunctionDecl(clang::FunctionDecl const * F) {
         clang::FunctionDecl const * const CD = F->getCanonicalDecl();
         if (F->isThisDeclarationADefinition()) {
-            if (Functions.end() == Functions.find(CD)) {
-                Functions[CD] = FunctionWrapperPtr(new FunctionDeclWrapper(F));
-            }
+            Functions[CD] = FunctionWrapperPtr(new FunctionDeclWrapper(F));
+        }
+        return true;
+    }
+
+    bool VisitCXXMethodDecl(clang::CXXMethodDecl const * F) {
+        clang::CXXMethodDecl const * const CD = F->getCanonicalDecl();
+        if (F->isThisDeclarationADefinition()) {
+            Functions[CD] = FunctionWrapperPtr(new MethodDeclWrapper(F));
         }
         return true;
     }

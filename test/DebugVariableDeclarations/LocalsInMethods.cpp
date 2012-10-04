@@ -2,8 +2,8 @@
 
 class A {
 
-    int m_i;
-    int m_j;
+    int m_i; // expected-note {{variable 'm_i' declared here}}
+    int m_j; // expected-note {{variable 'm_j' declared here}}
 
     A();
 
