@@ -74,7 +74,7 @@ public:
         }
     }
 
-    void GenerateReports(clang::DiagnosticsEngine & DE) {
+    void GenerateReports(clang::DiagnosticsEngine & DE) const {
         boost::for_each(Candidates,
             boost::bind(ReportVariablePseudoConstness, boost::ref(DE), _1));
     }
@@ -90,56 +90,7 @@ private:
 };
 
 
-// Represents a function declaration. This class try to add new methods
-// to clang::FunctionDecl. That type is part of an inheritance tree.
-// To add functions to it, here is a duplication of the hierarchy.
-struct FunctionWrapper : public boost::noncopyable {
-protected:
-    virtual clang::FunctionDecl const * GetFunctionDecl() const = 0;
-
-    virtual Variables GetVariables() const = 0;
-
-public:
-    // Debug functionality
-    virtual void DumpFuncionDeclaration(clang::DiagnosticsEngine &) const;
-    virtual void DumpVariableDeclaration(clang::DiagnosticsEngine &) const;
-
-    // Analysis functionality
-    virtual void DumpVariableChanges(clang::DiagnosticsEngine &) const;
-    virtual void DumpVariableUsages(clang::DiagnosticsEngine &) const;
-    virtual void CheckPseudoConstness(PseudoConstnessAnalysisState &) const;
-};
-
-void FunctionWrapper::DumpFuncionDeclaration(clang::DiagnosticsEngine & DE) const {
-    clang::FunctionDecl const * F = GetFunctionDecl();
-    ReportFunctionDeclaration(DE, F);
-}
-
-void FunctionWrapper::DumpVariableDeclaration(clang::DiagnosticsEngine & DE) const {
-    boost::for_each(GetVariables(),
-        boost::bind(ReportVariableDeclaration, boost::ref(DE), _1));
-}
-
-void FunctionWrapper::DumpVariableChanges(clang::DiagnosticsEngine & DE) const {
-    clang::FunctionDecl const * F = GetFunctionDecl();
-    ScopeAnalysis const & Analysis = ScopeAnalysis::AnalyseThis(*(F->getBody()));
-    Analysis.DebugChanged(DE);
-}
-
-void FunctionWrapper::DumpVariableUsages(clang::DiagnosticsEngine & DE) const {
-    clang::FunctionDecl const * F = GetFunctionDecl();
-    ScopeAnalysis const & Analysis = ScopeAnalysis::AnalyseThis(*(F->getBody()));
-    Analysis.DebugReferenced(DE);
-}
-
-void FunctionWrapper::CheckPseudoConstness(PseudoConstnessAnalysisState & State) const {
-    clang::FunctionDecl const * F = GetFunctionDecl();
-    ScopeAnalysis const & Analysis = ScopeAnalysis::AnalyseThis(*(F->getBody()));
-
-    boost::for_each(GetVariables(),
-        boost::bind(&PseudoConstnessAnalysisState::Eval, &State, boost::cref(Analysis), _1));
-}
-
+// method to copy variables out from declaration context
 Variables GetVariablesFromContext(clang::DeclContext const * const F) {
     Variables Result;
     for (clang::DeclContext::decl_iterator It(F->decls_begin()), End(F->decls_end()); It != End; ++It ) {
@@ -150,6 +101,7 @@ Variables GetVariablesFromContext(clang::DeclContext const * const F) {
     return Result;
 }
 
+// method to copy variables out from class declaration 
 Variables GetVariablesFromRecord(clang::RecordDecl const * const F) {
     Variables Result;
     for (clang::RecordDecl::field_iterator It(F->field_begin()), End(F->field_end()); It != End; ++It ) {
@@ -160,107 +112,167 @@ Variables GetVariablesFromRecord(clang::RecordDecl const * const F) {
     return Result;
 }
 
-// Implement wrapper for simple C functions.
-class FunctionDeclWrapper : public FunctionWrapper {
+
+// Visitor class base for analysis
+class ModuleVisitor
+    : public boost::noncopyable
+    , public clang::RecursiveASTVisitor<ModuleVisitor> {
 public:
-    FunctionDeclWrapper(clang::FunctionDecl const * const F)
-        : FunctionWrapper()
-        , Function(F)
+    typedef boost::shared_ptr<ModuleVisitor> Ptr;
+    static ModuleVisitor::Ptr CreateVisitor(Target);
+
+public:
+    virtual ~ModuleVisitor()
     { }
 
-protected:
-    clang::FunctionDecl const * GetFunctionDecl() const {
-        return Function;
+    virtual bool VisitFunctionDecl(clang::FunctionDecl const * F) {
+        return true;
     }
 
-    Variables GetVariables() const {
-        return GetVariablesFromContext(Function);
+    virtual bool VisitCXXMethodDecl(clang::CXXMethodDecl const * F) {
+        return true;
     }
 
-private:
-    clang::FunctionDecl const * const Function;
-};
-
-// Implement wrapper for C++ methods.
-class MethodDeclWrapper : public FunctionWrapper {
-public:
-    MethodDeclWrapper(clang::CXXMethodDecl const * const F)
-        : FunctionWrapper()
-        , Function(F)
-    { }
-
-protected:
-    clang::FunctionDecl const * GetFunctionDecl() const {
-        return Function;
-    }
-
-    Variables GetVariables() const {
-        Variables Result;
-        boost::copy(GetVariablesFromContext(Function)
-            , std::insert_iterator<Variables>(Result, Result.begin()));
-        boost::copy(GetVariablesFromRecord(Function->getParent()->getCanonicalDecl())
-            , std::insert_iterator<Variables>(Result, Result.begin()));
-        return Result;
-    }
-
-private:
-    clang::CXXMethodDecl const * const Function;
+    virtual void Dump(clang::DiagnosticsEngine &) const = 0;
 };
 
 
-// This class collect function declarations and create wrapped classes around them.
-class FunctionCollector : public clang::RecursiveASTVisitor<FunctionCollector> {
+class DebugFunctionDeclarations
+    : public ModuleVisitor {
 public:
-    void DumpFuncionDeclaration(clang::DiagnosticsEngine & DE) const {
-        boost::for_each(Functions | boost::adaptors::map_values,
-            boost::bind(&FunctionWrapper::DumpFuncionDeclaration, _1, boost::ref(DE)));
-    }
-
-    void DumpVariableDeclaration(clang::DiagnosticsEngine & DE) const {
-        boost::for_each(Functions | boost::adaptors::map_values,
-            boost::bind(&FunctionWrapper::DumpVariableDeclaration, _1, boost::ref(DE)));
-    }
-
-    void DumpVariableChanges(clang::DiagnosticsEngine & DE) const {
-        boost::for_each(Functions | boost::adaptors::map_values,
-            boost::bind(&FunctionWrapper::DumpVariableChanges, _1, boost::ref(DE)));
-    }
-
-    void DumpVariableUsages(clang::DiagnosticsEngine & DE) const {
-        boost::for_each(Functions | boost::adaptors::map_values,
-            boost::bind(&FunctionWrapper::DumpVariableUsages, _1, boost::ref(DE)));
-    }
-
-    void DumpPseudoConstness(clang::DiagnosticsEngine & DE) const {
-        PseudoConstnessAnalysisState State;
-        boost::for_each(Functions | boost::adaptors::map_values,
-            boost::bind(&FunctionWrapper::CheckPseudoConstness, _1, boost::ref(State)));
-        State.GenerateReports(DE);
-    }
-
-    // public visitor method.
     bool VisitFunctionDecl(clang::FunctionDecl const * F) {
-        clang::FunctionDecl const * const CD = F->getCanonicalDecl();
         if (F->isThisDeclarationADefinition()) {
-            Functions[CD] = FunctionWrapperPtr(new FunctionDeclWrapper(F));
+            Functions.insert(F);
         }
         return true;
     }
 
     bool VisitCXXMethodDecl(clang::CXXMethodDecl const * F) {
-        clang::CXXMethodDecl const * const CD = F->getCanonicalDecl();
         if (F->isThisDeclarationADefinition()) {
-            Functions[CD] = FunctionWrapperPtr(new MethodDeclWrapper(F));
+            Functions.insert(F);
         }
         return true;
     }
 
-private:
-    typedef boost::shared_ptr<FunctionWrapper> FunctionWrapperPtr;
-    typedef std::map<clang::FunctionDecl const *, FunctionWrapperPtr> FunctionWrapperPtrs;
+    void Dump(clang::DiagnosticsEngine & DE) const {
+        boost::for_each(Functions,
+            boost::bind(ReportFunctionDeclaration, boost::ref(DE), _1));
+    }
 
-    FunctionWrapperPtrs Functions;
+protected:
+    std::set<clang::FunctionDecl const *> Functions;
 };
+
+
+class DebugVariableDeclarations
+    : public ModuleVisitor {
+public:
+    bool VisitFunctionDecl(clang::FunctionDecl const * F) {
+        if (F->isThisDeclarationADefinition()) {
+            boost::copy(GetVariablesFromContext(F),
+                std::insert_iterator<Variables>(Result, Result.begin()));
+        }
+        return true;
+    }
+
+    bool VisitCXXMethodDecl(clang::CXXMethodDecl const * F) {
+        if (F->isThisDeclarationADefinition()) {
+            boost::copy(GetVariablesFromContext(F),
+                std::insert_iterator<Variables>(Result, Result.begin()));
+            boost::copy(GetVariablesFromRecord(F->getParent()->getCanonicalDecl()),
+                std::insert_iterator<Variables>(Result, Result.begin()));
+        }
+        return true;
+    }
+
+    void Dump(clang::DiagnosticsEngine & DE) const {
+        boost::for_each(Result,
+            boost::bind(ReportVariableDeclaration, boost::ref(DE), _1));
+    }
+
+private:
+    Variables Result;
+};
+
+
+class DebugVariableUsages
+    : public DebugFunctionDeclarations {
+private:
+    static void ReportVariableUsage(clang::DiagnosticsEngine & DE, clang::FunctionDecl const * F) {
+        ScopeAnalysis const & Analysis = ScopeAnalysis::AnalyseThis(*(F->getBody()));
+        Analysis.DebugReferenced(DE);
+    }
+
+public:
+    void Dump(clang::DiagnosticsEngine & DE) const {
+        boost::for_each(Functions,
+            boost::bind(ReportVariableUsage, boost::ref(DE), _1));
+    }
+};
+
+
+class DebugVariableChanges
+    : public DebugFunctionDeclarations {
+private:
+    static void ReportVariableUsage(clang::DiagnosticsEngine & DE, clang::FunctionDecl const * F) {
+        ScopeAnalysis const & Analysis = ScopeAnalysis::AnalyseThis(*(F->getBody()));
+        Analysis.DebugChanged(DE);
+    }
+
+public:
+    void Dump(clang::DiagnosticsEngine & DE) const {
+        boost::for_each(Functions,
+            boost::bind(ReportVariableUsage, boost::ref(DE), _1));
+    }
+};
+
+
+class AnalyseVariableUsage
+    : public ModuleVisitor {
+public:
+    bool VisitFunctionDecl(clang::FunctionDecl const * F) {
+        if (F->isThisDeclarationADefinition()) {
+            ScopeAnalysis const & Analysis = ScopeAnalysis::AnalyseThis(*(F->getBody()));
+            boost::for_each(GetVariablesFromContext(F),
+                boost::bind(&PseudoConstnessAnalysisState::Eval, &State, boost::cref(Analysis), _1));
+        }
+        return true;
+    }
+
+    bool VisitCXXMethodDecl(clang::CXXMethodDecl const * F) {
+        if (F->isThisDeclarationADefinition()) {
+            ScopeAnalysis const & Analysis = ScopeAnalysis::AnalyseThis(*(F->getBody()));
+            boost::for_each(GetVariablesFromContext(F),
+                boost::bind(&PseudoConstnessAnalysisState::Eval, &State, boost::cref(Analysis), _1));
+            boost::for_each(GetVariablesFromRecord(F->getParent()->getCanonicalDecl()),
+                boost::bind(&PseudoConstnessAnalysisState::Eval, &State, boost::cref(Analysis), _1));
+        }
+        return true;
+    }
+
+    void Dump(clang::DiagnosticsEngine & DE) const {
+        State.GenerateReports(DE);
+    }
+
+private:
+    PseudoConstnessAnalysisState State;
+};
+
+
+ModuleVisitor::Ptr ModuleVisitor::CreateVisitor(Target const State) {
+    switch (State) {
+    case FuncionDeclaration :
+        return ModuleVisitor::Ptr( new DebugFunctionDeclarations() );
+    case VariableDeclaration :
+        return ModuleVisitor::Ptr( new DebugVariableDeclarations() );
+    case VariableChanges:
+        return ModuleVisitor::Ptr( new DebugVariableChanges() );
+    case VariableUsages :
+        return ModuleVisitor::Ptr( new DebugVariableUsages() );
+    case PseudoConstness :
+        return ModuleVisitor::Ptr( new AnalyseVariableUsage() );
+    }
+}
 
 } // namespace anonymous
 
@@ -273,24 +285,7 @@ ModuleAnalysis::ModuleAnalysis(clang::CompilerInstance const & Compiler, Target 
 { }
 
 void ModuleAnalysis::HandleTranslationUnit(clang::ASTContext & Ctx) {
-    FunctionCollector Collector;
-    Collector.TraverseDecl(Ctx.getTranslationUnitDecl());
-
-    switch (State) {
-    case FuncionDeclaration :
-        Collector.DumpFuncionDeclaration(Reporter);
-        break;
-    case VariableDeclaration :
-        Collector.DumpVariableDeclaration(Reporter);
-        break;
-    case VariableChanges :
-        Collector.DumpVariableChanges(Reporter);
-        break;
-    case VariableUsages :
-        Collector.DumpVariableUsages(Reporter);
-        break;
-    case PseudoConstness :
-        Collector.DumpPseudoConstness(Reporter);
-        break;
-    }
+    ModuleVisitor::Ptr V = ModuleVisitor::CreateVisitor(State);
+    V->TraverseDecl(Ctx.getTranslationUnitDecl());
+    V->Dump(Reporter);
 }
