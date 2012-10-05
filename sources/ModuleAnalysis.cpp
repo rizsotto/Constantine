@@ -91,11 +91,13 @@ private:
 
 
 // method to copy variables out from declaration context
-Variables GetVariablesFromContext(clang::DeclContext const * const F) {
+Variables GetVariablesFromContext(clang::DeclContext const * const F, bool const WithoutArgs = false) {
     Variables Result;
     for (clang::DeclContext::decl_iterator It(F->decls_begin()), End(F->decls_end()); It != End; ++It ) {
         if (clang::VarDecl const * const D = clang::dyn_cast<clang::VarDecl const>(*It)) {
-            Result.insert(D);
+            if (! (WithoutArgs && (clang::dyn_cast<clang::ParmVarDecl const>(D)))) {
+                Result.insert(D);
+            }
         }
     }
     return Result;
@@ -113,7 +115,10 @@ Variables GetVariablesFromRecord(clang::RecordDecl const * const F) {
 }
 
 
-// Visitor class base for analysis
+// Base class for analysis. Implement function declaration visitor, which visit
+// functions only once. The traversal algorithm is calling all methods, which is
+// not desired. In case of a CXXMethodDecl, it was calling the VisitFunctionDecl
+// and the VisitCXXMethodDecl as well. This dispatching is reworked in this class.
 class ModuleVisitor
     : public boost::noncopyable
     , public clang::RecursiveASTVisitor<ModuleVisitor> {
@@ -121,33 +126,39 @@ public:
     typedef boost::shared_ptr<ModuleVisitor> Ptr;
     static ModuleVisitor::Ptr CreateVisitor(Target);
 
-public:
     virtual ~ModuleVisitor()
     { }
 
-    virtual bool VisitFunctionDecl(clang::FunctionDecl const * F) {
-        return true;
+public:
+    // public visitor method.
+    bool VisitFunctionDecl(clang::FunctionDecl const * F) {
+        if (clang::CXXMethodDecl const * const D = clang::dyn_cast<clang::CXXMethodDecl const>(F)) {
+            return OnCXXMethodDecl(D);
+        }
+        return OnFunctionDecl(F);
     }
 
-    virtual bool VisitCXXMethodDecl(clang::CXXMethodDecl const * F) {
-        return true;
-    }
-
+public:
+    // interface methods with different visibilities.
     virtual void Dump(clang::DiagnosticsEngine &) const = 0;
+
+protected:
+    virtual bool OnFunctionDecl(clang::FunctionDecl const *) = 0;
+    virtual bool OnCXXMethodDecl(clang::CXXMethodDecl const *) = 0;
 };
 
 
 class DebugFunctionDeclarations
     : public ModuleVisitor {
-public:
-    bool VisitFunctionDecl(clang::FunctionDecl const * F) {
+protected:
+    bool OnFunctionDecl(clang::FunctionDecl const * const F) {
         if (F->isThisDeclarationADefinition()) {
             Functions.insert(F);
         }
         return true;
     }
 
-    bool VisitCXXMethodDecl(clang::CXXMethodDecl const * F) {
+    bool OnCXXMethodDecl(clang::CXXMethodDecl const * const F) {
         if (F->isThisDeclarationADefinition()) {
             Functions.insert(F);
         }
@@ -166,8 +177,8 @@ protected:
 
 class DebugVariableDeclarations
     : public ModuleVisitor {
-public:
-    bool VisitFunctionDecl(clang::FunctionDecl const * F) {
+private:
+    bool OnFunctionDecl(clang::FunctionDecl const * const F) {
         if (F->isThisDeclarationADefinition()) {
             boost::copy(GetVariablesFromContext(F),
                 std::insert_iterator<Variables>(Result, Result.begin()));
@@ -175,9 +186,9 @@ public:
         return true;
     }
 
-    bool VisitCXXMethodDecl(clang::CXXMethodDecl const * F) {
+    bool OnCXXMethodDecl(clang::CXXMethodDecl const * const F) {
         if (F->isThisDeclarationADefinition()) {
-            boost::copy(GetVariablesFromContext(F),
+            boost::copy(GetVariablesFromContext(F, F->isVirtual()),
                 std::insert_iterator<Variables>(Result, Result.begin()));
             boost::copy(GetVariablesFromRecord(F->getParent()->getCanonicalDecl()),
                 std::insert_iterator<Variables>(Result, Result.begin()));
@@ -203,7 +214,6 @@ private:
         Analysis.DebugReferenced(DE);
     }
 
-public:
     void Dump(clang::DiagnosticsEngine & DE) const {
         boost::for_each(Functions,
             boost::bind(ReportVariableUsage, boost::ref(DE), _1));
@@ -219,7 +229,6 @@ private:
         Analysis.DebugChanged(DE);
     }
 
-public:
     void Dump(clang::DiagnosticsEngine & DE) const {
         boost::for_each(Functions,
             boost::bind(ReportVariableUsage, boost::ref(DE), _1));
@@ -229,8 +238,8 @@ public:
 
 class AnalyseVariableUsage
     : public ModuleVisitor {
-public:
-    bool VisitFunctionDecl(clang::FunctionDecl const * F) {
+private:
+    bool OnFunctionDecl(clang::FunctionDecl const * const F) {
         if (F->isThisDeclarationADefinition()) {
             ScopeAnalysis const & Analysis = ScopeAnalysis::AnalyseThis(*(F->getBody()));
             boost::for_each(GetVariablesFromContext(F),
@@ -239,10 +248,10 @@ public:
         return true;
     }
 
-    bool VisitCXXMethodDecl(clang::CXXMethodDecl const * F) {
+    bool OnCXXMethodDecl(clang::CXXMethodDecl const * const F) {
         if (F->isThisDeclarationADefinition()) {
             ScopeAnalysis const & Analysis = ScopeAnalysis::AnalyseThis(*(F->getBody()));
-            boost::for_each(GetVariablesFromContext(F),
+            boost::for_each(GetVariablesFromContext(F, F->isVirtual()),
                 boost::bind(&PseudoConstnessAnalysisState::Eval, &State, boost::cref(Analysis), _1));
             boost::for_each(GetVariablesFromRecord(F->getParent()->getCanonicalDecl()),
                 boost::bind(&PseudoConstnessAnalysisState::Eval, &State, boost::cref(Analysis), _1));

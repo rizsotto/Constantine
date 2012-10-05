@@ -23,3 +23,17 @@ void A::f3(unsigned int k) { // expected-note {{variable 'k' declared here}}
 void A::f4(int i, // expected-note {{variable 'i' declared here}}
            int j) const { // expected-note {{variable 'j' declared here}}
 }
+
+class Base {
+    virtual int vf1(int k) {
+        return k;
+    }
+
+    virtual int vf2(int k, int j) = 0;
+};
+
+class Sub : public Base {
+    int vf2(int k, int j) {
+        return k + j;
+    }
+};
