@@ -48,10 +48,7 @@ private:
         clang::DeclaratorDecl const * & Current = Result.first;
 
         if (clang::DeclaratorDecl const * const VD =
-                clang::dyn_cast<clang::VarDecl const>(Decl)) {
-            Current = VD;
-        } else if (clang::DeclaratorDecl const * const VD =
-                clang::dyn_cast<clang::FieldDecl const>(Decl)) {
+                clang::dyn_cast<clang::DeclaratorDecl const>(Decl)) {
             Current = VD;
         }
     }
@@ -73,6 +70,15 @@ public:
         switch (Expr->getOpcode()) {
         case clang::UO_AddrOf:
         case clang::UO_Deref:
+            SetType(Expr->getType());
+        }
+        return true;
+    }
+
+    bool VisitMemberExpr(clang::MemberExpr const * const Expr) {
+        if (clang::CXXThisExpr const * const C =
+                clang::dyn_cast<clang::CXXThisExpr const>(Expr->getBase())) {
+            SetVariable(Expr->getMemberDecl());
             SetType(Expr->getType());
         }
         return true;
@@ -219,8 +225,13 @@ public:
         return true;
     }
 
+    bool TraverseMemberExpr(clang::MemberExpr * Stmt) {
+        AddToResults(Stmt);
+        return true;
+    }
+
     void Report(clang::DiagnosticsEngine & DE) const {
-        UsageRefCollector::Report("variable '%0' was used", DE);
+        UsageRefCollector::Report("symbol '%0' was used", DE);
     }
 };
 

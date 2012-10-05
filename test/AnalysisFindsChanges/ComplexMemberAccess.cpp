@@ -9,7 +9,7 @@ struct A {
     }
 
     void SetValue(int const & i) {
-        Value = i;
+        Value = i; // expected-note {{variable 'Value' with type 'int' was changed}}
     }
 };
 

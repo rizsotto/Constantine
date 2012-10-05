@@ -65,3 +65,14 @@ namespace n {
         };
     }
 }
+
+void wrapper_method() { // expected-note {{function 'wrapper_method' declared here}}
+
+    class F {
+        void h7() { // expected-note {{function 'h7' declared here}}
+        }
+
+        void h8(int) { // expected-note {{function 'h8' declared here}}
+        }
+    };
+}
