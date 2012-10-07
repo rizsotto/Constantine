@@ -46,11 +46,36 @@ private:
 
     void SetVariable(clang::Decl const * const Decl) {
         clang::DeclaratorDecl const * & Current = Result.first;
+        clang::Decl const * const D = Decl->getCanonicalDecl();
 
         if (clang::DeclaratorDecl const * const VD =
-                clang::dyn_cast<clang::DeclaratorDecl const>(Decl)) {
+                clang::dyn_cast<clang::DeclaratorDecl const>(D)) {
             Current = VD;
         }
+    }
+
+    // These are helper struct/method to figure out was it a member
+    // method call or a call on a variable.
+    struct ExprVisitor
+        : public clang::RecursiveASTVisitor<ExprVisitor> {
+    public:
+        ExprVisitor()
+            : clang::RecursiveASTVisitor<ExprVisitor>()
+            , Found(false)
+        { }
+
+        bool VisitCXXThisExpr(clang::CXXThisExpr const *) {
+            Found = true;
+        }
+
+        bool Found;
+    };
+
+    static bool IsCXXThisExpr(clang::Expr const * const E) {
+        ExprVisitor V;
+        clang::Stmt const * const Stmt = E;
+        V.TraverseStmt(const_cast<clang::Stmt*>(Stmt));
+        return V.Found;
     }
 
 public:
@@ -76,8 +101,7 @@ public:
     }
 
     bool VisitMemberExpr(clang::MemberExpr const * const Expr) {
-        if (clang::CXXThisExpr const * const C =
-                clang::dyn_cast<clang::CXXThisExpr const>(Expr->getBase())) {
+        if (IsCXXThisExpr(Expr->getBase())) {
             SetVariable(Expr->getMemberDecl());
             SetType(Expr->getType());
         }
