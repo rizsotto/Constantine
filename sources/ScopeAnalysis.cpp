@@ -15,7 +15,7 @@ class UsageExtractor
     : public clang::RecursiveASTVisitor<UsageExtractor> {
 public:
     typedef ScopeAnalysis::UsageRef UsageRef;
-    typedef std::pair<clang::VarDecl const *, UsageRef> Usage;
+    typedef std::pair<clang::DeclaratorDecl const *, UsageRef> Usage;
 
     static Usage GetUsage(clang::Expr const & Expr) {
         Usage Result;
@@ -45,9 +45,37 @@ private:
     }
 
     void SetVariable(clang::Decl const * const Decl) {
-        if (clang::VarDecl const * const VD =
-                clang::dyn_cast<clang::VarDecl const>(Decl))
-            Result.first = VD;
+        clang::DeclaratorDecl const * & Current = Result.first;
+        clang::Decl const * const D = Decl->getCanonicalDecl();
+
+        if (clang::DeclaratorDecl const * const VD =
+                clang::dyn_cast<clang::DeclaratorDecl const>(D)) {
+            Current = VD;
+        }
+    }
+
+    // These are helper struct/method to figure out was it a member
+    // method call or a call on a variable.
+    struct ExprVisitor
+        : public clang::RecursiveASTVisitor<ExprVisitor> {
+    public:
+        ExprVisitor()
+            : clang::RecursiveASTVisitor<ExprVisitor>()
+            , Found(false)
+        { }
+
+        bool VisitCXXThisExpr(clang::CXXThisExpr const *) {
+            Found = true;
+        }
+
+        bool Found;
+    };
+
+    static bool IsCXXThisExpr(clang::Expr const * const E) {
+        ExprVisitor V;
+        clang::Stmt const * const Stmt = E;
+        V.TraverseStmt(const_cast<clang::Stmt*>(Stmt));
+        return V.Found;
     }
 
 public:
@@ -72,6 +100,14 @@ public:
         return true;
     }
 
+    bool VisitMemberExpr(clang::MemberExpr const * const Expr) {
+        if (IsCXXThisExpr(Expr->getBase())) {
+            SetVariable(Expr->getMemberDecl());
+            SetType(Expr->getType());
+        }
+        return true;
+    }
+
 private:
     Usage & Result;
 };
@@ -91,7 +127,7 @@ protected:
     }
 
     void AddToResults(UsageExtractor::Usage const & U) {
-        if (clang::VarDecl const * const VD = U.first) {
+        if (clang::DeclaratorDecl const * const VD = U.first) {
             ScopeAnalysis::UsageRefsMap::iterator It = Results.find(VD);
             if (Results.end() == It) {
                 std::pair<ScopeAnalysis::UsageRefsMap::iterator, bool> R =
@@ -141,37 +177,16 @@ public:
 public:
     // Assignments are mutating variables.
     bool VisitBinaryOperator(clang::BinaryOperator const * const Stmt) {
-        switch (Stmt->getOpcode()) {
-        case clang::BO_Assign:
-        case clang::BO_MulAssign:
-        case clang::BO_DivAssign:
-        case clang::BO_RemAssign:
-        case clang::BO_AddAssign:
-        case clang::BO_SubAssign:
-        case clang::BO_ShlAssign:
-        case clang::BO_ShrAssign:
-        case clang::BO_AndAssign:
-        case clang::BO_XorAssign:
-        case clang::BO_OrAssign:
+        if (Stmt->isAssignmentOp()) {
             AddToResults(Stmt->getLHS());
-            break;
-        default:
-            break;
         }
         return true;
     }
 
-    // Some operator does mutate variables.
+    // Inc/Dec-rement operator does mutate variables.
     bool VisitUnaryOperator(clang::UnaryOperator const * const Stmt) {
-        switch (Stmt->getOpcode()) {
-        case clang::UO_PostInc:
-        case clang::UO_PostDec:
-        case clang::UO_PreInc:
-        case clang::UO_PreDec:
+        if (Stmt->isIncrementDecrementOp()) {
             AddToResults(Stmt->getSubExpr());
-            break;
-        default:
-            break;
         }
         return true;
     }
@@ -194,10 +209,11 @@ public:
             int const Args = std::min(Stmt->getNumArgs(), F->getNumParams());
             for (int It = 0; It < Args; ++It) {
                 clang::ParmVarDecl const * const P = F->getParamDecl(It);
-                UsageExtractor::Usage U = UsageExtractor::GetUsage( *(Stmt->getArg(It)) );
                 if (IsNonConstReferenced(P->getType())) {
-                    // change the usage type to the refered type of the
-                    // parameter declaration.
+                    // same as AddToResults(*(Stmt->getArg(It))), but..
+                    UsageExtractor::Usage U =
+                        UsageExtractor::GetUsage( *(Stmt->getArg(It)) );
+                    // change the usage type to the parameter declaration.
                     U.second.first = (*(P->getType())).getPointeeType();
                     AddToResults(U);
                 }
@@ -228,14 +244,18 @@ public:
         , clang::RecursiveASTVisitor<VariableAccessCollector>()
     { }
 
-    // Variable access is a usage of the variable.
     bool VisitDeclRefExpr(clang::DeclRefExpr const * const Stmt) {
         AddToResults(Stmt);
         return true;
     }
 
+    bool TraverseMemberExpr(clang::MemberExpr * Stmt) {
+        AddToResults(Stmt);
+        return true;
+    }
+
     void Report(clang::DiagnosticsEngine & DE) const {
-        UsageRefCollector::Report("variable '%0' was used", DE);
+        UsageRefCollector::Report("symbol '%0' was used", DE);
     }
 };
 
@@ -254,11 +274,11 @@ ScopeAnalysis ScopeAnalysis::AnalyseThis(clang::Stmt const & Stmt) {
     return Result;
 }
 
-bool ScopeAnalysis::WasChanged(clang::VarDecl const * const Decl) const {
+bool ScopeAnalysis::WasChanged(clang::DeclaratorDecl const * const Decl) const {
     return (Changed.end() != Changed.find(Decl));
 }
 
-bool ScopeAnalysis::WasReferenced(clang::VarDecl const * const Decl) const {
+bool ScopeAnalysis::WasReferenced(clang::DeclaratorDecl const * const Decl) const {
     return (Used.end() != Used.find(Decl));
 }
 

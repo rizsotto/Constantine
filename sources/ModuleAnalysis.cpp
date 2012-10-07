@@ -14,40 +14,63 @@
 #include <boost/shared_ptr.hpp>
 #include <boost/range.hpp>
 #include <boost/range/adaptor/map.hpp>
+#include <boost/range/adaptor/filtered.hpp>
 #include <boost/range/algorithm/copy.hpp>
 #include <boost/range/algorithm/for_each.hpp>
 #include <boost/range/algorithm/transform.hpp>
+#include <boost/range/algorithm/count_if.hpp>
 
 
 namespace {
 
 // Report function for pseudo constness analysis.
-void ReportVariablePseudoConstness(clang::DiagnosticsEngine & DE, clang::VarDecl const * const V) {
-    static char const * const Message = "variable '%0' could be declared as const";
-    unsigned const Id = DE.getCustomDiagID(clang::DiagnosticsEngine::Warning, Message);
+void EmitWarningMessage(clang::DiagnosticsEngine & DE, char const * const M, clang::DeclaratorDecl const * const V) {
+    unsigned const Id =
+        DE.getCustomDiagID(clang::DiagnosticsEngine::Warning, M);
     clang::DiagnosticBuilder DB = DE.Report(V->getLocStart(), Id);
     DB << V->getNameAsString();
+    DB.setForceEmit();
+}
+
+void ReportVariablePseudoConstness(clang::DiagnosticsEngine & DE, clang::DeclaratorDecl const * const V) {
+    static char const * const Message =
+        "variable '%0' could be declared as const";
+    EmitWarningMessage(DE, Message, V);
+}
+
+void ReportFunctionPseudoConstness(clang::DiagnosticsEngine & DE, clang::DeclaratorDecl const * const V) {
+    static char const * const Message =
+        "function '%0' could be declared as const";
+    EmitWarningMessage(DE, Message, V);
+}
+
+void ReportFunctionPseudoStaticness(clang::DiagnosticsEngine & DE, clang::DeclaratorDecl const * const V) {
+    static char const * const Message =
+        "function '%0' could be declared as static";
+    EmitWarningMessage(DE, Message, V);
 }
 
 // Report function for debug functionality.
-void ReportVariableDeclaration(clang::DiagnosticsEngine & DE, clang::VarDecl const * const V) {
-    static char const * const Message = "variable '%0' declared here";
-    unsigned const Id = DE.getCustomDiagID(clang::DiagnosticsEngine::Note, Message);
+void EmitNoteMessage(clang::DiagnosticsEngine & DE, char const * const M, clang::DeclaratorDecl const * const V) {
+    unsigned const Id = DE.getCustomDiagID(clang::DiagnosticsEngine::Note, M);
     clang::DiagnosticBuilder DB = DE.Report(V->getLocStart(), Id);
     DB << V->getNameAsString();
     DB.setForceEmit();
 }
 
-void ReportFunctionDeclaration(clang::DiagnosticsEngine & DE, clang::FunctionDecl const * const F) {
+void ReportVariableDeclaration(clang::DiagnosticsEngine & DE, clang::DeclaratorDecl const * const V) {
+    static char const * const Message = "variable '%0' declared here";
+    EmitNoteMessage(DE, Message, V);
+}
+
+void ReportFunctionDeclaration(clang::DiagnosticsEngine & DE, clang::DeclaratorDecl const * const V) {
     static char const * const Message = "function '%0' declared here";
-    unsigned const Id = DE.getCustomDiagID(clang::DiagnosticsEngine::Note, Message);
-    clang::DiagnosticBuilder DB = DE.Report(F->getSourceRange().getBegin(), Id);
-    DB << F->getNameAsString();
-    DB.setForceEmit();
+    EmitNoteMessage(DE, Message, V);
 }
 
 
-typedef std::set<clang::VarDecl const *> Variables;
+typedef std::set<clang::DeclaratorDecl const *> Variables;
+typedef std::set<clang::CXXMethodDecl const *> Methods;
 
 
 // Pseudo constness analysis detects what variable can be declare as const.
@@ -61,7 +84,7 @@ public:
         , Changed()
     { }
 
-    void Eval(ScopeAnalysis const & Analysis, clang::VarDecl const * const V) {
+    void Eval(ScopeAnalysis const & Analysis, clang::DeclaratorDecl const * const V) {
         if (Analysis.WasChanged(V)) {
             Candidates.erase(V);
             Changed.insert(V);
@@ -74,13 +97,13 @@ public:
         }
     }
 
-    void GenerateReports(clang::DiagnosticsEngine & DE) {
+    void GenerateReports(clang::DiagnosticsEngine & DE) const {
         boost::for_each(Candidates,
             boost::bind(ReportVariablePseudoConstness, boost::ref(DE), _1));
     }
 
 private:
-    static bool IsConst(clang::VarDecl const & D) {
+    static bool IsConst(clang::DeclaratorDecl const & D) {
         return (D.getType().getNonReferenceType().isConstQualified());
     }
 
@@ -90,185 +113,281 @@ private:
 };
 
 
-// Represents a function declaration. This class try to add new methods
-// to clang::FunctionDecl. That type is part of an inheritance tree.
-// To add functions to it, here is a duplication of the hierarchy.
-struct FunctionWrapper : public boost::noncopyable {
-protected:
-    virtual clang::FunctionDecl const * GetFunctionDecl() const = 0;
+// method to copy variables out from declaration context
+Variables GetVariablesFromContext(clang::DeclContext const * const F, bool const WithoutArgs = false) {
+    Variables Result;
+    for (clang::DeclContext::decl_iterator It(F->decls_begin()), End(F->decls_end()); It != End; ++It ) {
+        if (clang::VarDecl const * const D = clang::dyn_cast<clang::VarDecl const>(*It)) {
+            if (! (WithoutArgs && (clang::dyn_cast<clang::ParmVarDecl const>(D)))) {
+                Result.insert(D);
+            }
+        }
+    }
+    return Result;
+}
 
-    typedef std::set<clang::VarDecl const *> VarDeclSet;
-    virtual VarDeclSet GetArguments() const = 0;
-    virtual VarDeclSet GetLocals() const = 0;
-    virtual VarDeclSet GetMembers() const = 0;
+// method to copy variables out from class declaration
+void GetVariablesFromRecord(clang::CXXRecordDecl const & Rec, Variables & Out) {
+    for (clang::RecordDecl::field_iterator It(Rec.field_begin()), End(Rec.field_end()); It != End; ++It ) {
+        if (clang::FieldDecl const * const D = clang::dyn_cast<clang::FieldDecl const>(*It)) {
+            Out.insert(D);
+        }
+    }
+}
 
+bool GetVariablesFromRecord(clang::CXXRecordDecl const * const Rec, void * State) {
+    Variables & Out = *((Variables*)State);
+    GetVariablesFromRecord(*Rec, Out);
+    return true;
+}
+
+Variables GetVariablesFromRecord(clang::CXXRecordDecl const * const Rec) {
+    Variables Result;
+    GetVariablesFromRecord(*Rec, Result);
+    Rec->forallBases(GetVariablesFromRecord, &Result);
+    return Result;
+}
+
+// method to copy methods out from class declaration 
+void GetMethodsFromRecord(clang::CXXRecordDecl const & Rec, Methods & Out) {
+    for (clang::CXXRecordDecl::method_iterator It(Rec.method_begin()), End(Rec.method_end()); It != End; ++It) {
+        if (clang::CXXMethodDecl const * const D = clang::dyn_cast<clang::CXXMethodDecl const>(*It)) {
+            Out.insert(D->getCanonicalDecl());
+        }
+    }
+}
+
+bool GetMethodsFromRecord(clang::CXXRecordDecl const * const Rec, void * State) {
+    Methods & Out = *((Methods*)State);
+    GetMethodsFromRecord(*Rec, Out);
+    return true;
+}
+
+Methods GetMethodsFromRecord(clang::CXXRecordDecl const * const Rec) {
+    Methods Result;
+    GetMethodsFromRecord(*Rec, Result);
+    Rec->forallBases(GetMethodsFromRecord, &Result);
+    return Result;
+}
+
+
+// Base class for analysis. Implement function declaration visitor, which visit
+// functions only once. The traversal algorithm is calling all methods, which is
+// not desired. In case of a CXXMethodDecl, it was calling the VisitFunctionDecl
+// and the VisitCXXMethodDecl as well. This dispatching is reworked in this class.
+class ModuleVisitor
+    : public boost::noncopyable
+    , public clang::RecursiveASTVisitor<ModuleVisitor> {
 public:
-    // Debug functionality
-    virtual void DumpFuncionDeclaration(clang::DiagnosticsEngine &) const;
-    virtual void DumpArguments(clang::DiagnosticsEngine &) const;
-    virtual void DumpLocalVariables(clang::DiagnosticsEngine &) const;
-    virtual void DumpMemberVariables(clang::DiagnosticsEngine &) const;
+    typedef boost::shared_ptr<ModuleVisitor> Ptr;
+    static ModuleVisitor::Ptr CreateVisitor(Target);
 
-    // Analysis functionality
-    virtual void DumpVariableChanges(clang::DiagnosticsEngine &) const;
-    virtual void DumpVariableUsages(clang::DiagnosticsEngine &) const;
-    virtual void CheckPseudoConstness(PseudoConstnessAnalysisState &) const;
-};
-
-void FunctionWrapper::DumpFuncionDeclaration(clang::DiagnosticsEngine & DE) const {
-    clang::FunctionDecl const * F = GetFunctionDecl();
-    ReportFunctionDeclaration(DE, F);
-}
-
-void FunctionWrapper::DumpArguments(clang::DiagnosticsEngine & DE) const {
-    boost::for_each(GetArguments(),
-        boost::bind(ReportVariableDeclaration, boost::ref(DE), _1));
-}
-
-void FunctionWrapper::DumpLocalVariables(clang::DiagnosticsEngine & DE) const {
-    boost::for_each(GetLocals(),
-        boost::bind(ReportVariableDeclaration, boost::ref(DE), _1));
-}
-
-void FunctionWrapper::DumpMemberVariables(clang::DiagnosticsEngine & DE) const {
-    boost::for_each(GetMembers(),
-        boost::bind(ReportVariableDeclaration, boost::ref(DE), _1));
-}
-
-void FunctionWrapper::DumpVariableChanges(clang::DiagnosticsEngine & DE) const {
-    clang::FunctionDecl const * F = GetFunctionDecl();
-    ScopeAnalysis const & Analysis = ScopeAnalysis::AnalyseThis(*(F->getBody()));
-    Analysis.DebugChanged(DE);
-}
-
-void FunctionWrapper::DumpVariableUsages(clang::DiagnosticsEngine & DE) const {
-    clang::FunctionDecl const * F = GetFunctionDecl();
-    ScopeAnalysis const & Analysis = ScopeAnalysis::AnalyseThis(*(F->getBody()));
-    Analysis.DebugReferenced(DE);
-}
-
-void FunctionWrapper::CheckPseudoConstness(PseudoConstnessAnalysisState & State) const {
-    clang::FunctionDecl const * F = GetFunctionDecl();
-    ScopeAnalysis const & Analysis = ScopeAnalysis::AnalyseThis(*(F->getBody()));
-
-    boost::for_each(GetArguments(),
-        boost::bind(&PseudoConstnessAnalysisState::Eval, &State, boost::cref(Analysis), _1));
-    boost::for_each(GetLocals(),
-        boost::bind(&PseudoConstnessAnalysisState::Eval, &State, boost::cref(Analysis), _1));
-    boost::for_each(GetMembers(),
-        boost::bind(&PseudoConstnessAnalysisState::Eval, &State, boost::cref(Analysis), _1));
-}
-
-// Implement wrapper for simple C functions.
-class FunctionDeclWrapper : public FunctionWrapper {
-public:
-    FunctionDeclWrapper(clang::FunctionDecl const * const F)
-        : FunctionWrapper()
-        , Function(F)
+    virtual ~ModuleVisitor()
     { }
 
-protected:
-    static clang::VarDecl const * CastVarDecl(clang::Decl const * const Decl) {
-        clang::VarDecl const * const Candidate =
-            clang::dyn_cast<clang::VarDecl const>(Decl);
-
-        return
-            (   (0 != Candidate)
-            &&  (0 == clang::dyn_cast<clang::ParmVarDecl const>(Candidate))
-            )
-                ? Candidate
-                : 0;
-    }
-
-    clang::FunctionDecl const * GetFunctionDecl() const {
-        return Function;
-    }
-
-    VarDeclSet GetArguments() const {
-        VarDeclSet Result;
-        boost::copy(
-            boost::make_iterator_range(Function->param_begin(), Function->param_end()),
-            std::insert_iterator<VarDeclSet>(Result, Result.begin()));
-        return Result;
-    }
-
-    VarDeclSet GetLocals() const {
-        VarDeclSet Result;
-        boost::transform(
-              boost::make_iterator_range(Function->decls_begin(), Function->decls_end())
-            , std::insert_iterator<VarDeclSet>(Result, Result.begin())
-            , &FunctionDeclWrapper::CastVarDecl
-        );
-        Result.erase(0);
-        return Result;
-    }
-
-    VarDeclSet GetMembers() const {
-        return VarDeclSet();
-    }
-
-private:
-    clang::FunctionDecl const * const Function;
-};
-
-
-// This class collect function declarations and create wrapped classes around them.
-class FunctionCollector : public clang::RecursiveASTVisitor<FunctionCollector> {
 public:
-    void DumpFuncionDeclaration(clang::DiagnosticsEngine & DE) const {
-        boost::for_each(Functions | boost::adaptors::map_values,
-            boost::bind(&FunctionWrapper::DumpFuncionDeclaration, _1, boost::ref(DE)));
-    }
-
-    void DumpArguments(clang::DiagnosticsEngine & DE) const {
-        boost::for_each(Functions | boost::adaptors::map_values,
-            boost::bind(&FunctionWrapper::DumpArguments, _1, boost::ref(DE)));
-    }
-
-    void DumpLocalVariables(clang::DiagnosticsEngine & DE) const {
-        boost::for_each(Functions | boost::adaptors::map_values,
-            boost::bind(&FunctionWrapper::DumpLocalVariables, _1, boost::ref(DE)));
-    }
-
-    void DumpMemberVariables(clang::DiagnosticsEngine & DE) const {
-        boost::for_each(Functions | boost::adaptors::map_values,
-            boost::bind(&FunctionWrapper::DumpMemberVariables, _1, boost::ref(DE)));
-    }
-
-    void DumpVariableChanges(clang::DiagnosticsEngine & DE) const {
-        boost::for_each(Functions | boost::adaptors::map_values,
-            boost::bind(&FunctionWrapper::DumpVariableChanges, _1, boost::ref(DE)));
-    }
-
-    void DumpVariableUsages(clang::DiagnosticsEngine & DE) const {
-        boost::for_each(Functions | boost::adaptors::map_values,
-            boost::bind(&FunctionWrapper::DumpVariableUsages, _1, boost::ref(DE)));
-    }
-
-    void DumpPseudoConstness(clang::DiagnosticsEngine & DE) const {
-        PseudoConstnessAnalysisState State;
-        boost::for_each(Functions | boost::adaptors::map_values,
-            boost::bind(&FunctionWrapper::CheckPseudoConstness, _1, boost::ref(State)));
-        State.GenerateReports(DE);
-    }
-
-    // this is for visitor pattern
+    // public visitor method.
     bool VisitFunctionDecl(clang::FunctionDecl const * F) {
-        clang::FunctionDecl const * const CD = F->getCanonicalDecl();
-        if (F->isThisDeclarationADefinition()) {
-            if (Functions.end() == Functions.find(CD)) {
-                Functions[CD] = FunctionWrapperPtr(new FunctionDeclWrapper(F));
-            }
+        if (! (F->isThisDeclarationADefinition()))
+            return true;
+
+        if (clang::CXXMethodDecl const * const D = clang::dyn_cast<clang::CXXMethodDecl const>(F)) {
+            OnCXXMethodDecl(D);
+        } else {
+            OnFunctionDecl(F);
         }
         return true;
     }
 
-private:
-    typedef boost::shared_ptr<FunctionWrapper> FunctionWrapperPtr;
-    typedef std::map<clang::FunctionDecl const *, FunctionWrapperPtr> FunctionWrapperPtrs;
+public:
+    // interface methods with different visibilities.
+    virtual void Dump(clang::DiagnosticsEngine &) const = 0;
 
-    FunctionWrapperPtrs Functions;
+protected:
+    virtual void OnFunctionDecl(clang::FunctionDecl const *) = 0;
+    virtual void OnCXXMethodDecl(clang::CXXMethodDecl const *) = 0;
 };
+
+
+class DebugFunctionDeclarations
+    : public ModuleVisitor {
+protected:
+    void OnFunctionDecl(clang::FunctionDecl const * const F) {
+        Functions.insert(F);
+    }
+
+    void OnCXXMethodDecl(clang::CXXMethodDecl const * const F) {
+        Functions.insert(F);
+    }
+
+    void Dump(clang::DiagnosticsEngine & DE) const {
+        boost::for_each(Functions,
+            boost::bind(ReportFunctionDeclaration, boost::ref(DE), _1));
+    }
+
+protected:
+    std::set<clang::FunctionDecl const *> Functions;
+};
+
+
+class DebugVariableDeclarations
+    : public ModuleVisitor {
+private:
+    void OnFunctionDecl(clang::FunctionDecl const * const F) {
+        boost::copy(GetVariablesFromContext(F),
+            std::insert_iterator<Variables>(Result, Result.begin()));
+    }
+
+    void OnCXXMethodDecl(clang::CXXMethodDecl const * const F) {
+        boost::copy(GetVariablesFromContext(F, F->isVirtual()),
+            std::insert_iterator<Variables>(Result, Result.begin()));
+        boost::copy(GetVariablesFromRecord(F->getParent()->getCanonicalDecl()),
+            std::insert_iterator<Variables>(Result, Result.begin()));
+    }
+
+    void Dump(clang::DiagnosticsEngine & DE) const {
+        boost::for_each(Result,
+            boost::bind(ReportVariableDeclaration, boost::ref(DE), _1));
+    }
+
+private:
+    Variables Result;
+};
+
+
+class DebugVariableUsages
+    : public DebugFunctionDeclarations {
+private:
+    static void ReportVariableUsage(clang::DiagnosticsEngine & DE, clang::FunctionDecl const * F) {
+        ScopeAnalysis const & Analysis = ScopeAnalysis::AnalyseThis(*(F->getBody()));
+        Analysis.DebugReferenced(DE);
+    }
+
+    void Dump(clang::DiagnosticsEngine & DE) const {
+        boost::for_each(Functions,
+            boost::bind(ReportVariableUsage, boost::ref(DE), _1));
+    }
+};
+
+
+class DebugVariableChanges
+    : public DebugFunctionDeclarations {
+private:
+    static void ReportVariableUsage(clang::DiagnosticsEngine & DE, clang::FunctionDecl const * F) {
+        ScopeAnalysis const & Analysis = ScopeAnalysis::AnalyseThis(*(F->getBody()));
+        Analysis.DebugChanged(DE);
+    }
+
+    void Dump(clang::DiagnosticsEngine & DE) const {
+        boost::for_each(Functions,
+            boost::bind(ReportVariableUsage, boost::ref(DE), _1));
+    }
+};
+
+
+class AnalyseVariableUsage
+    : public ModuleVisitor {
+private:
+    void OnFunctionDecl(clang::FunctionDecl const * const F) {
+        ScopeAnalysis const & Analysis = ScopeAnalysis::AnalyseThis(*(F->getBody()));
+        boost::for_each(GetVariablesFromContext(F),
+            boost::bind(&PseudoConstnessAnalysisState::Eval, &State, boost::cref(Analysis), _1));
+    }
+
+    void OnCXXMethodDecl(clang::CXXMethodDecl const * const F) {
+        clang::CXXRecordDecl const * const RecordDecl =
+            F->getParent()->getCanonicalDecl();
+        Variables const MemberVariables = GetVariablesFromRecord(RecordDecl);
+        // check variables first,
+        ScopeAnalysis const & Analysis = ScopeAnalysis::AnalyseThis(*(F->getBody()));
+        boost::for_each(GetVariablesFromContext(F, F->isVirtual()),
+            boost::bind(&PseudoConstnessAnalysisState::Eval, &State, boost::cref(Analysis), _1));
+        boost::for_each(MemberVariables,
+            boost::bind(&PseudoConstnessAnalysisState::Eval, &State, boost::cref(Analysis), _1));
+        // then check the method itself.
+        if ((! F->isVirtual()) &&
+            (! F->isStatic()) &&
+            F->isUserProvided() &&
+            IsCXXMethodDeclOnly(F)
+        ) {
+            Methods const MemberFunctions = GetMethodsFromRecord(RecordDecl);
+            // check the constness first..
+            unsigned int const MemberChanges =
+                boost::count_if(MemberVariables,
+                    boost::bind(&ScopeAnalysis::WasChanged, &Analysis, _1));
+            unsigned int const FunctionChanges =
+                boost::count_if(
+                    MemberFunctions |
+                        boost::adaptors::filtered(IsMutatingMethod()),
+                    boost::bind(&ScopeAnalysis::WasReferenced, &Analysis, _1));
+            // if it looks const, it might be even static..
+            if ((0 == MemberChanges) && (0 == FunctionChanges)) {
+                unsigned int const MemberAccess =
+                    boost::count_if(MemberVariables,
+                        boost::bind(&ScopeAnalysis::WasReferenced, &Analysis, _1));
+                unsigned int const FunctionAccess =
+                    boost::count_if(
+                        MemberFunctions |
+                            boost::adaptors::filtered(IsMemberMethod()),
+                        boost::bind(&ScopeAnalysis::WasReferenced, &Analysis, _1));
+                if ((0 == MemberAccess) && (0 == FunctionAccess)) {
+                    StaticCandidates.insert(F);
+                } else if (! F->isConst()) {
+                    ConstCandidates.insert(F);
+                }
+            }
+        }
+    }
+
+    void Dump(clang::DiagnosticsEngine & DE) const {
+        State.GenerateReports(DE);
+        boost::for_each(ConstCandidates,
+            boost::bind(ReportFunctionPseudoConstness, boost::ref(DE), _1));
+        boost::for_each(StaticCandidates,
+            boost::bind(ReportFunctionPseudoStaticness, boost::ref(DE), _1));
+    }
+
+private:
+    struct IsMutatingMethod {
+        bool operator()(clang::CXXMethodDecl const * const F) const {
+            return (! F->isStatic()) && (! F->isConst());
+        }
+    };
+
+    struct IsMemberMethod {
+        bool operator()(clang::CXXMethodDecl const * const F) const {
+            return (! F->isStatic());
+        }
+    };
+
+    static bool IsCXXMethodDeclOnly(clang::CXXMethodDecl const * const F) {
+        return
+            (0 == clang::dyn_cast<clang::CXXConstructorDecl const>(F))
+        &&  (0 == clang::dyn_cast<clang::CXXConversionDecl const>(F))
+        &&  (0 == clang::dyn_cast<clang::CXXDestructorDecl const>(F));
+    }
+
+private:
+    PseudoConstnessAnalysisState State;
+    Methods ConstCandidates;
+    Methods StaticCandidates;
+};
+
+
+ModuleVisitor::Ptr ModuleVisitor::CreateVisitor(Target const State) {
+    switch (State) {
+    case FuncionDeclaration :
+        return ModuleVisitor::Ptr( new DebugFunctionDeclarations() );
+    case VariableDeclaration :
+        return ModuleVisitor::Ptr( new DebugVariableDeclarations() );
+    case VariableChanges:
+        return ModuleVisitor::Ptr( new DebugVariableChanges() );
+    case VariableUsages :
+        return ModuleVisitor::Ptr( new DebugVariableUsages() );
+    case PseudoConstness :
+        return ModuleVisitor::Ptr( new AnalyseVariableUsage() );
+    }
+}
 
 } // namespace anonymous
 
@@ -281,30 +400,7 @@ ModuleAnalysis::ModuleAnalysis(clang::CompilerInstance const & Compiler, Target 
 { }
 
 void ModuleAnalysis::HandleTranslationUnit(clang::ASTContext & Ctx) {
-    FunctionCollector Collector;
-    Collector.TraverseDecl(Ctx.getTranslationUnitDecl());
-
-    switch (State) {
-    case FuncionDeclaration :
-        Collector.DumpFuncionDeclaration(Reporter);
-        break;
-    case Arguments :
-        Collector.DumpArguments(Reporter);
-        break;
-    case LocalVariables :
-        Collector.DumpLocalVariables(Reporter);
-        break;
-    case MemberVariables :
-        Collector.DumpMemberVariables(Reporter);
-        break;
-    case VariableChanges :
-        Collector.DumpVariableChanges(Reporter);
-        break;
-    case VariableUsages :
-        Collector.DumpVariableUsages(Reporter);
-        break;
-    case PseudoConstness :
-        Collector.DumpPseudoConstness(Reporter);
-        break;
-    }
+    ModuleVisitor::Ptr V = ModuleVisitor::CreateVisitor(State);
+    V->TraverseDecl(Ctx.getTranslationUnitDecl());
+    V->Dump(Reporter);
 }

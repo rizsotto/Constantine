@@ -36,9 +36,7 @@ public:
             llvm::cl::init(PseudoConstness),
             llvm::cl::values(
                 clEnumVal(FuncionDeclaration, "Enable function detection"),
-                clEnumVal(Arguments, "Enable arguments detection"),
-                clEnumVal(LocalVariables, "Enable local variables detection"),
-                clEnumVal(MemberVariables, "Enable member variables detection"),
+                clEnumVal(VariableDeclaration, "Enable variables detection"),
                 clEnumVal(VariableChanges, "Enable variable change detection"),
                 clEnumVal(VariableUsages, "Enable variable usage detection"),
                 clEnumValEnd))

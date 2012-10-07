@@ -11,9 +11,7 @@
 
 enum Target
     { FuncionDeclaration
-    , Arguments
-    , LocalVariables
-    , MemberVariables
+    , VariableDeclaration
     , VariableChanges
     , VariableUsages
     , PseudoConstness
