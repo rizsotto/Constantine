@@ -127,24 +127,46 @@ Variables GetVariablesFromContext(clang::DeclContext const * const F, bool const
 }
 
 // method to copy variables out from class declaration
-Variables GetVariablesFromRecord(clang::RecordDecl const * const F) {
-    Variables Result;
-    for (clang::RecordDecl::field_iterator It(F->field_begin()), End(F->field_end()); It != End; ++It ) {
+void GetVariablesFromRecord(clang::CXXRecordDecl const & Rec, Variables & Out) {
+    for (clang::RecordDecl::field_iterator It(Rec.field_begin()), End(Rec.field_end()); It != End; ++It ) {
         if (clang::FieldDecl const * const D = clang::dyn_cast<clang::FieldDecl const>(*It)) {
-            Result.insert(D);
+            Out.insert(D);
         }
     }
+}
+
+bool GetVariablesFromRecord(clang::CXXRecordDecl const * const Rec, void * State) {
+    Variables & Out = *((Variables*)State);
+    GetVariablesFromRecord(*Rec, Out);
+    return true;
+}
+
+Variables GetVariablesFromRecord(clang::CXXRecordDecl const * const Rec) {
+    Variables Result;
+    GetVariablesFromRecord(*Rec, Result);
+    Rec->forallBases(GetVariablesFromRecord, &Result);
     return Result;
 }
 
 // method to copy methods out from class declaration 
-Methods GetMethodsFromRecord(clang::CXXRecordDecl const * const F) {
-    Methods Result;
-    for (clang::CXXRecordDecl::method_iterator It(F->method_begin()), End(F->method_end()); It != End; ++It) {
+void GetMethodsFromRecord(clang::CXXRecordDecl const & Rec, Methods & Out) {
+    for (clang::CXXRecordDecl::method_iterator It(Rec.method_begin()), End(Rec.method_end()); It != End; ++It) {
         if (clang::CXXMethodDecl const * const D = clang::dyn_cast<clang::CXXMethodDecl const>(*It)) {
-            Result.insert(D);
+            Out.insert(D->getCanonicalDecl());
         }
     }
+}
+
+bool GetMethodsFromRecord(clang::CXXRecordDecl const * const Rec, void * State) {
+    Methods & Out = *((Methods*)State);
+    GetMethodsFromRecord(*Rec, Out);
+    return true;
+}
+
+Methods GetMethodsFromRecord(clang::CXXRecordDecl const * const Rec) {
+    Methods Result;
+    GetMethodsFromRecord(*Rec, Result);
+    Rec->forallBases(GetMethodsFromRecord, &Result);
     return Result;
 }
 
