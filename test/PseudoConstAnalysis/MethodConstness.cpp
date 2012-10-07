@@ -1,37 +1,95 @@
 // RUN: %clang_cc1 %s -fsyntax-only -verify
 
-struct Base {
-    int const value;
+struct BaseOne {
+    int value;
 
-    Base();
+    BaseOne();
 
     virtual int vf1(int, int);
     int f1(int);
+
+    int f2();
+
+    int cf3() const;
+    int f3();
+
+    int f4() const;
+    static int sf1();
 };
 
-struct Sub : public Base {
+struct BaseTwo {
+    virtual int vg1(int) = 0;
+};
+
+struct Sub : public BaseOne, public BaseTwo {
     int vf1(int, int);
+    int vg1(int);
 
-    virtual int vf2(int);
+    virtual int vh1(int);
+
+    int h2();
+    int h3();
+    int h4();
+    int h5();
 };
 
 
-Base::Base()
+BaseOne::BaseOne()
     : value(0)
 { }
 
-int Base::vf1(int i, int j) {
+int BaseOne::vf1(int i, int j) {
     return value + i + j;
 }
 
-int Base::f1(int const i) { // expected-warning {{function 'f1' could be declared as const}}
+int BaseOne::f1(int const i) { // expected-warning {{function 'f1' could be declared as const}}
     return value + i;
+}
+
+int BaseOne::f2() {
+    return vf1(1, 2);
+}
+
+int BaseOne::cf3() const {
+    return value;
+}
+
+int BaseOne::f3() { // expected-warning {{function 'f3' could be declared as const}}
+    return cf3();
+}
+
+int BaseOne::f4() const { // expected-warning {{function 'f4' could be declared as static}}
+    return 8;
+}
+
+int BaseOne::sf1() {
+    return 8;
 }
 
 int Sub::vf1(int i, int j) {
     return value + i + j;
 }
 
-int Sub::vf2(int i) {
+int Sub::vg1(int i) {
+    return i;
+}
+
+int Sub::vh1(int i) {
     return value + i;
+}
+
+int Sub::h2() {
+    return f2();
+}
+
+int Sub::h3() {
+    return ++value;
+}
+
+int Sub::h4() { // expected-warning {{function 'h4' could be declared as const}}
+    return value;
+}
+
+int Sub::h5() { // expected-warning {{function 'h5' could be declared as static}}
+    return sf1();
 }

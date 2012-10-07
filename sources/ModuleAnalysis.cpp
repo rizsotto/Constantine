@@ -307,7 +307,6 @@ private:
         // then check the method itself.
         if ((! F->isVirtual()) &&
             (! F->isStatic()) &&
-            (! F->isConst()) &&
             F->isUserProvided() &&
             IsCXXMethodDeclOnly(F)
         ) {
@@ -333,7 +332,7 @@ private:
                         boost::bind(&ScopeAnalysis::WasReferenced, &Analysis, _1));
                 if ((0 == MemberAccess) && (0 == FunctionAccess)) {
                     StaticCandidates.insert(F);
-                } else {
+                } else if (! F->isConst()) {
                     ConstCandidates.insert(F);
                 }
             }
