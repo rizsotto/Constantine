@@ -73,6 +73,15 @@ typedef std::set<clang::DeclaratorDecl const *> Variables;
 typedef std::set<clang::CXXMethodDecl const *> Methods;
 
 
+// helper method not to be so verbose.
+struct IsItFromMainModule {
+    bool operator()(clang::Decl const * const D) const {
+        clang::SourceManager const & SM = D->getASTContext().getSourceManager();
+        return SM.isFromMainFile(D->getLocation());
+    }
+};
+
+
 // Pseudo constness analysis detects what variable can be declare as const.
 // This analysis runs through multiple scopes. We need to store the state of
 // the ongoing analysis. Once the variable was changed can't be const.
@@ -98,7 +107,7 @@ public:
     }
 
     void GenerateReports(clang::DiagnosticsEngine & DE) const {
-        boost::for_each(Candidates,
+        boost::for_each(Candidates | boost::adaptors::filtered(IsItFromMainModule()),
             boost::bind(ReportVariablePseudoConstness, boost::ref(DE), _1));
     }
 
@@ -341,9 +350,9 @@ private:
 
     void Dump(clang::DiagnosticsEngine & DE) const {
         State.GenerateReports(DE);
-        boost::for_each(ConstCandidates,
+        boost::for_each(ConstCandidates | boost::adaptors::filtered(IsItFromMainModule()),
             boost::bind(ReportFunctionPseudoConstness, boost::ref(DE), _1));
-        boost::for_each(StaticCandidates,
+        boost::for_each(StaticCandidates | boost::adaptors::filtered(IsItFromMainModule()),
             boost::bind(ReportFunctionPseudoStaticness, boost::ref(DE), _1));
     }
 
