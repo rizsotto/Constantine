@@ -76,7 +76,7 @@ private:
     }
 
 private:
-    llvm::cl::opt<Target> Debug;
+    llvm::cl::opt<Target> const Debug;
 };
 
 } // namespace anonymous

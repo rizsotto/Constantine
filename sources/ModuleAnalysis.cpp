@@ -5,13 +5,13 @@
 
 #include <iterator>
 #include <map>
+#include <memory>
 
 #include <clang/AST/AST.h>
 #include <clang/AST/RecursiveASTVisitor.h>
 
 #include <boost/noncopyable.hpp>
 #include <boost/bind.hpp>
-#include <boost/shared_ptr.hpp>
 #include <boost/range.hpp>
 #include <boost/range/adaptor/map.hpp>
 #include <boost/range/adaptor/filtered.hpp>
@@ -27,7 +27,7 @@ namespace {
 void EmitWarningMessage(clang::DiagnosticsEngine & DE, char const * const M, clang::DeclaratorDecl const * const V) {
     unsigned const Id =
         DE.getCustomDiagID(clang::DiagnosticsEngine::Warning, M);
-    clang::DiagnosticBuilder DB = DE.Report(V->getLocStart(), Id);
+    clang::DiagnosticBuilder const DB = DE.Report(V->getLocStart(), Id);
     DB << V->getNameAsString();
     DB.setForceEmit();
 }
@@ -53,7 +53,7 @@ void ReportFunctionPseudoStaticness(clang::DiagnosticsEngine & DE, clang::Declar
 // Report function for debug functionality.
 void EmitNoteMessage(clang::DiagnosticsEngine & DE, char const * const M, clang::DeclaratorDecl const * const V) {
     unsigned const Id = DE.getCustomDiagID(clang::DiagnosticsEngine::Note, M);
-    clang::DiagnosticBuilder DB = DE.Report(V->getLocStart(), Id);
+    clang::DiagnosticBuilder const DB = DE.Report(V->getLocStart(), Id);
     DB << V->getNameAsString();
     DB.setForceEmit();
 }
@@ -188,7 +188,7 @@ class ModuleVisitor
     : public boost::noncopyable
     , public clang::RecursiveASTVisitor<ModuleVisitor> {
 public:
-    typedef boost::shared_ptr<ModuleVisitor> Ptr;
+    typedef std::auto_ptr<ModuleVisitor> Ptr;
     static ModuleVisitor::Ptr CreateVisitor(Target);
 
     virtual ~ModuleVisitor()
@@ -196,7 +196,7 @@ public:
 
 public:
     // public visitor method.
-    bool VisitFunctionDecl(clang::FunctionDecl const * F) {
+    bool VisitFunctionDecl(clang::FunctionDecl const * const F) {
         if (! (F->isThisDeclarationADefinition()))
             return true;
 
@@ -267,7 +267,7 @@ private:
 class DebugVariableUsages
     : public DebugFunctionDeclarations {
 private:
-    static void ReportVariableUsage(clang::DiagnosticsEngine & DE, clang::FunctionDecl const * F) {
+    static void ReportVariableUsage(clang::DiagnosticsEngine & DE, clang::FunctionDecl const * const F) {
         ScopeAnalysis const & Analysis = ScopeAnalysis::AnalyseThis(*(F->getBody()));
         Analysis.DebugReferenced(DE);
     }
@@ -282,7 +282,7 @@ private:
 class DebugVariableChanges
     : public DebugFunctionDeclarations {
 private:
-    static void ReportVariableUsage(clang::DiagnosticsEngine & DE, clang::FunctionDecl const * F) {
+    static void ReportVariableUsage(clang::DiagnosticsEngine & DE, clang::FunctionDecl const * const F) {
         ScopeAnalysis const & Analysis = ScopeAnalysis::AnalyseThis(*(F->getBody()));
         Analysis.DebugChanged(DE);
     }

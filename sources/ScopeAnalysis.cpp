@@ -36,7 +36,7 @@ private:
     { }
 
     void SetType(clang::QualType const & In) {
-        static clang::QualType Empty = clang::QualType();
+        static clang::QualType const Empty = clang::QualType();
 
         clang::QualType & Current = Result.second.first;
         if (Empty == Current) {
@@ -66,6 +66,7 @@ private:
 
         bool VisitCXXThisExpr(clang::CXXThisExpr const *) {
             Found = true;
+            return true;
         }
 
         bool Found;
@@ -96,6 +97,8 @@ public:
         case clang::UO_AddrOf:
         case clang::UO_Deref:
             SetType(Expr->getType());
+        default:
+            ;
         }
         return true;
     }
@@ -249,7 +252,7 @@ public:
         return true;
     }
 
-    bool TraverseMemberExpr(clang::MemberExpr * Stmt) {
+    bool TraverseMemberExpr(clang::MemberExpr * const Stmt) {
         AddToResults(Stmt);
         return true;
     }
