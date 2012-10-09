@@ -1,8 +1,8 @@
 // Copyright 2012 by Laszlo Nagy [see file MIT-LICENSE]
 
 #include "ScopeAnalysis.hpp"
+#include "IsCXXThisExpr.hpp"
 
-#include <boost/noncopyable.hpp>
 #include <boost/bind.hpp>
 #include <boost/range.hpp>
 #include <boost/range/algorithm/for_each.hpp>
@@ -10,35 +10,6 @@
 #include <clang/AST/RecursiveASTVisitor.h>
 
 namespace {
-
-// These are helper struct/method to figure out was it a member
-// method call or a call on a variable.
-class IsCXXThisExpr
-    : public boost::noncopyable
-    , public clang::RecursiveASTVisitor<IsCXXThisExpr> {
-public:
-    static bool Check(clang::Expr const * const E) {
-        IsCXXThisExpr V;
-        clang::Stmt const * const Stmt = E;
-        V.TraverseStmt(const_cast<clang::Stmt*>(Stmt));
-        return V.Found;
-    }
-
-    // public visitor method.
-    bool VisitCXXThisExpr(clang::CXXThisExpr const *) {
-        Found = true;
-        return true;
-    }
-
-private:
-    IsCXXThisExpr()
-        : boost::noncopyable()
-        , clang::RecursiveASTVisitor<IsCXXThisExpr>()
-        , Found(false)
-    { }
-
-    bool Found;
-};
 
 // Usage extract method implemented in visitor style.
 class UsageExtractor
@@ -147,7 +118,7 @@ protected:
         if (clang::DeclaratorDecl const * const VD = U.first) {
             ScopeAnalysis::UsageRefsMap::iterator It = Results.find(VD);
             if (Results.end() == It) {
-                std::pair<ScopeAnalysis::UsageRefsMap::iterator, bool> R =
+                std::pair<ScopeAnalysis::UsageRefsMap::iterator, bool> const R =
                     Results.insert(ScopeAnalysis::UsageRefsMap::value_type(VD, ScopeAnalysis::UsageRefs()));
                 It = R.first;
             }
@@ -169,7 +140,7 @@ private:
         unsigned const Id = DE.getCustomDiagID(clang::DiagnosticsEngine::Note, Message);
         ScopeAnalysis::UsageRefs const & Ls = Var.second;
         for (ScopeAnalysis::UsageRefs::const_iterator It(Ls.begin()), End(Ls.end()); It != End; ++It) {
-            clang::DiagnosticBuilder DB = DE.Report(It->second.getBegin(), Id);
+            clang::DiagnosticBuilder const DB = DE.Report(It->second.getBegin(), Id);
             DB << Var.first->getNameAsString();
             DB << It->first.getAsString();
             DB.setForceEmit();

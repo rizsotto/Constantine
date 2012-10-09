@@ -15,6 +15,8 @@ struct BaseOne {
 
     int f4() const;
     static int sf1();
+
+    int f5() const;
 };
 
 struct BaseTwo {
@@ -59,6 +61,11 @@ int BaseOne::f3() { // expected-warning {{function 'f3' could be declared as con
 }
 
 int BaseOne::f4() const { // expected-warning {{function 'f4' could be declared as static}}
+    return 8;
+}
+
+int BaseOne::f5() const {
+    BaseOne const Value = *this;
     return 8;
 }
 

@@ -2,6 +2,7 @@
 
 #include "ModuleAnalysis.hpp"
 #include "ScopeAnalysis.hpp"
+#include "IsCXXThisExpr.hpp"
 
 #include <iterator>
 #include <map>
@@ -339,7 +340,8 @@ private:
                         MemberFunctions |
                             boost::adaptors::filtered(IsMemberMethod()),
                         boost::bind(&ScopeAnalysis::WasReferenced, &Analysis, _1));
-                if ((0 == MemberAccess) && (0 == FunctionAccess)) {
+                if ((0 == MemberAccess) && (0 == FunctionAccess)
+                && (! IsCXXThisExpr::Check(F->getBody()))) {
                     StaticCandidates.insert(F);
                 } else if (! F->isConst()) {
                     ConstCandidates.insert(F);
