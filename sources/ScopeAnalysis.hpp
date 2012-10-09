@@ -5,6 +5,7 @@
 
 #include <list>
 #include <map>
+#include <utility>
 
 #include <clang/AST/AST.h>
 #include <clang/Basic/Diagnostic.h>

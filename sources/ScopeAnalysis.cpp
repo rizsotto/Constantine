@@ -2,6 +2,7 @@
 
 #include "ScopeAnalysis.hpp"
 
+#include <boost/noncopyable.hpp>
 #include <boost/bind.hpp>
 #include <boost/range.hpp>
 #include <boost/range/algorithm/for_each.hpp>
@@ -9,6 +10,35 @@
 #include <clang/AST/RecursiveASTVisitor.h>
 
 namespace {
+
+// These are helper struct/method to figure out was it a member
+// method call or a call on a variable.
+class IsCXXThisExpr
+    : public boost::noncopyable
+    , public clang::RecursiveASTVisitor<IsCXXThisExpr> {
+public:
+    static bool Check(clang::Expr const * const E) {
+        IsCXXThisExpr V;
+        clang::Stmt const * const Stmt = E;
+        V.TraverseStmt(const_cast<clang::Stmt*>(Stmt));
+        return V.Found;
+    }
+
+    // public visitor method.
+    bool VisitCXXThisExpr(clang::CXXThisExpr const *) {
+        Found = true;
+        return true;
+    }
+
+private:
+    IsCXXThisExpr()
+        : boost::noncopyable()
+        , clang::RecursiveASTVisitor<IsCXXThisExpr>()
+        , Found(false)
+    { }
+
+    bool Found;
+};
 
 // Usage extract method implemented in visitor style.
 class UsageExtractor
@@ -18,7 +48,7 @@ public:
     typedef std::pair<clang::DeclaratorDecl const *, UsageRef> Usage;
 
     static Usage GetUsage(clang::Expr const & Expr) {
-        Usage Result;
+        Usage Result(0, UsageRef());
         {
             clang::Stmt const * const Stmt = &Expr;
 
@@ -37,46 +67,30 @@ private:
 
     void SetType(clang::QualType const & In) {
         static clang::QualType const Empty = clang::QualType();
-
         clang::QualType & Current = Result.second.first;
-        if (Empty == Current) {
-            Current = In;
+
+        if (Empty != Current) {
+            return;
         }
+        if (Empty == In) {
+            return;
+        }
+        Current = In;
     }
 
     void SetVariable(clang::Decl const * const Decl) {
+        static clang::DeclaratorDecl const * const Empty = 0;
         clang::DeclaratorDecl const * & Current = Result.first;
-        clang::Decl const * const D = Decl->getCanonicalDecl();
 
-        if (clang::DeclaratorDecl const * const VD =
-                clang::dyn_cast<clang::DeclaratorDecl const>(D)) {
-            Current = VD;
+        if (Empty != Current) {
+            return;
         }
-    }
-
-    // These are helper struct/method to figure out was it a member
-    // method call or a call on a variable.
-    struct ExprVisitor
-        : public clang::RecursiveASTVisitor<ExprVisitor> {
-    public:
-        ExprVisitor()
-            : clang::RecursiveASTVisitor<ExprVisitor>()
-            , Found(false)
-        { }
-
-        bool VisitCXXThisExpr(clang::CXXThisExpr const *) {
-            Found = true;
-            return true;
+        clang::DeclaratorDecl const * const In =
+            clang::dyn_cast<clang::DeclaratorDecl const>(Decl->getCanonicalDecl());
+        if (Empty == In) {
+            return;
         }
-
-        bool Found;
-    };
-
-    static bool IsCXXThisExpr(clang::Expr const * const E) {
-        ExprVisitor V;
-        clang::Stmt const * const Stmt = E;
-        V.TraverseStmt(const_cast<clang::Stmt*>(Stmt));
-        return V.Found;
+        Current = In;
     }
 
 public:
@@ -104,7 +118,7 @@ public:
     }
 
     bool VisitMemberExpr(clang::MemberExpr const * const Expr) {
-        if (IsCXXThisExpr(Expr->getBase())) {
+        if (IsCXXThisExpr::Check(Expr->getBase())) {
             SetVariable(Expr->getMemberDecl());
             SetType(Expr->getType());
         }
@@ -194,17 +208,6 @@ public:
         return true;
     }
 
-    // Variables are mutated if non-const member function called.
-    bool VisitMemberExpr(clang::MemberExpr const * const Stmt) {
-        clang::Type const * const T = Stmt->getMemberDecl()->getType().getCanonicalType().getTypePtr();
-        if (clang::FunctionProtoType const * const F = T->getAs<clang::FunctionProtoType>()) {
-            if (! (F->getTypeQuals() & clang::Qualifiers::Const) ) {
-                AddToResults(Stmt);
-            }
-        }
-        return true;
-    }
-
     // Arguments potentially mutated when you pass by-pointer or by-reference.
     bool VisitCallExpr(clang::CallExpr const * const Stmt) {
         if (clang::FunctionDecl const * const F = Stmt->getDirectCallee()) {
@@ -219,6 +222,32 @@ public:
                     // change the usage type to the parameter declaration.
                     U.second.first = (*(P->getType())).getPointeeType();
                     AddToResults(U);
+                }
+            }
+        }
+        return true;
+    }
+
+    // Objects are mutated when non const member call happen.
+    bool VisitCXXMemberCallExpr(clang::CXXMemberCallExpr const * const Stmt) {
+        if (clang::CXXMethodDecl const * const MD = Stmt->getMethodDecl()) {
+            if ((! MD->isConst()) && (! MD->isStatic())) {
+                AddToResults(Stmt->getImplicitObjectArgument());
+            }
+        }
+        return true;
+    }
+
+    // Objects are mutated when non const operator called.
+    bool VisitCXXOperatorCallExpr(clang::CXXOperatorCallExpr const * const Stmt) {
+        // this implimentation relies on that here the first argument
+        // is the 'this', while it was not the case with CXXMethodDecl.
+        if (clang::FunctionDecl const * const F = Stmt->getDirectCallee()) {
+            if (clang::CXXMethodDecl const * const MD = clang::dyn_cast<clang::CXXMethodDecl const>(F)) {
+                if ((! MD->isConst()) && (! MD->isStatic())) {
+                    if (0 < Stmt->getNumArgs()) {
+                        AddToResults(Stmt->getArg(0));
+                    }
                 }
             }
         }
@@ -252,8 +281,10 @@ public:
         return true;
     }
 
-    bool TraverseMemberExpr(clang::MemberExpr * const Stmt) {
-        AddToResults(Stmt);
+    bool VisitMemberExpr(clang::MemberExpr * const Stmt) {
+        if (IsCXXThisExpr::Check(Stmt)) {
+            AddToResults(Stmt);
+        }
         return true;
     }
 
