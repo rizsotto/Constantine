@@ -5,6 +5,7 @@
 
 #include <boost/bind.hpp>
 #include <boost/range.hpp>
+#include <boost/range/adaptor/filtered.hpp>
 #include <boost/range/algorithm/for_each.hpp>
 
 #include <clang/AST/RecursiveASTVisitor.h>
@@ -127,8 +128,19 @@ protected:
         }
     }
 
+    // helper method not to be so verbose.
+    struct IsItFromMainModule {
+        bool operator()(clang::Decl const * const D) const {
+            clang::SourceManager const & SM = D->getASTContext().getSourceManager();
+            return SM.isFromMainFile(D->getLocation());
+        }
+        bool operator()(ScopeAnalysis::UsageRefsMap::value_type const & Var) const {
+            return this->operator()(Var.first);
+        }
+    };
+
     void Report(char const * const M, clang::DiagnosticsEngine & DE) const {
-        boost::for_each(Results,
+        boost::for_each(Results | boost::adaptors::filtered(IsItFromMainModule()),
             boost::bind(UsageRefCollector::Report, _1, M, boost::ref(DE)));
     }
 
