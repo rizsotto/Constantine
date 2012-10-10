@@ -192,6 +192,24 @@ public:
     }
 
     // Arguments potentially mutated when you pass by-pointer or by-reference.
+    bool VisitCXXConstructExpr(clang::CXXConstructExpr const * const Stmt) {
+        clang::CXXConstructorDecl const * const F = Stmt->getConstructor();
+        // check the function parameters one by one
+        int const Args = std::min(Stmt->getNumArgs(), F->getNumParams());
+        for (int It = 0; It < Args; ++It) {
+            clang::ParmVarDecl const * const P = F->getParamDecl(It);
+            if (IsNonConstReferenced(P->getType())) {
+                // same as AddToResults(*(Stmt->getArg(It))), but..
+                UsageExtractor::Usage U =
+                    UsageExtractor::GetUsage( *(Stmt->getArg(It)) );
+                // change the usage type to the parameter declaration.
+                U.second.first = (*(P->getType())).getPointeeType();
+                AddToResults(U);
+            }
+        }
+        return true;
+    }
+
     bool VisitCallExpr(clang::CallExpr const * const Stmt) {
         if (clang::FunctionDecl const * const F = Stmt->getDirectCallee()) {
             // check the function parameters one by one
