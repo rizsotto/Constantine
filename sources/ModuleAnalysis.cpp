@@ -1,6 +1,8 @@
 // Copyright 2012 by Laszlo Nagy [see file MIT-LICENSE]
 
 #include "ModuleAnalysis.hpp"
+
+#include "DeclarationCollector.hpp"
 #include "ScopeAnalysis.hpp"
 #include "IsCXXThisExpr.hpp"
 
@@ -70,10 +72,6 @@ void ReportFunctionDeclaration(clang::DiagnosticsEngine & DE, clang::DeclaratorD
 }
 
 
-typedef std::set<clang::DeclaratorDecl const *> Variables;
-typedef std::set<clang::CXXMethodDecl const *> Methods;
-
-
 // helper method not to be so verbose.
 struct IsItFromMainModule {
     bool operator()(clang::Decl const * const D) const {
@@ -121,64 +119,6 @@ private:
     Variables Candidates;
     Variables Changed;
 };
-
-
-// method to copy variables out from declaration context
-Variables GetVariablesFromContext(clang::DeclContext const * const F, bool const WithoutArgs = false) {
-    Variables Result;
-    for (clang::DeclContext::decl_iterator It(F->decls_begin()), End(F->decls_end()); It != End; ++It ) {
-        if (clang::VarDecl const * const D = clang::dyn_cast<clang::VarDecl const>(*It)) {
-            if (! (WithoutArgs && (clang::dyn_cast<clang::ParmVarDecl const>(D)))) {
-                Result.insert(D);
-            }
-        }
-    }
-    return Result;
-}
-
-// method to copy variables out from class declaration
-void GetVariablesFromRecord(clang::CXXRecordDecl const & Rec, Variables & Out) {
-    for (clang::RecordDecl::field_iterator It(Rec.field_begin()), End(Rec.field_end()); It != End; ++It ) {
-        if (clang::FieldDecl const * const D = clang::dyn_cast<clang::FieldDecl const>(*It)) {
-            Out.insert(D);
-        }
-    }
-}
-
-bool GetVariablesFromRecord(clang::CXXRecordDecl const * const Rec, void * State) {
-    Variables & Out = *((Variables*)State);
-    GetVariablesFromRecord(*Rec, Out);
-    return true;
-}
-
-Variables GetVariablesFromRecord(clang::CXXRecordDecl const * const Rec) {
-    Variables Result;
-    GetVariablesFromRecord(*Rec, Result);
-    Rec->forallBases(GetVariablesFromRecord, &Result);
-    return Result;
-}
-
-// method to copy methods out from class declaration 
-void GetMethodsFromRecord(clang::CXXRecordDecl const & Rec, Methods & Out) {
-    for (clang::CXXRecordDecl::method_iterator It(Rec.method_begin()), End(Rec.method_end()); It != End; ++It) {
-        if (clang::CXXMethodDecl const * const D = clang::dyn_cast<clang::CXXMethodDecl const>(*It)) {
-            Out.insert(D->getCanonicalDecl());
-        }
-    }
-}
-
-bool GetMethodsFromRecord(clang::CXXRecordDecl const * const Rec, void * State) {
-    Methods & Out = *((Methods*)State);
-    GetMethodsFromRecord(*Rec, Out);
-    return true;
-}
-
-Methods GetMethodsFromRecord(clang::CXXRecordDecl const * const Rec) {
-    Methods Result;
-    GetMethodsFromRecord(*Rec, Result);
-    Rec->forallBases(GetMethodsFromRecord, &Result);
-    return Result;
-}
 
 
 // Base class for analysis. Implement function declaration visitor, which visit
