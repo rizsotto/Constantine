@@ -327,8 +327,7 @@ private:
                     boost::bind(&ScopeAnalysis::WasChanged, &Analysis, _1));
             unsigned int const FunctionChanges =
                 boost::count_if(
-                    MemberFunctions |
-                        boost::adaptors::filtered(IsMutatingMethod()),
+                    MemberFunctions | boost::adaptors::filtered(IsMutatingMethod()),
                     boost::bind(&ScopeAnalysis::WasReferenced, &Analysis, _1));
             // if it looks const, it might be even static..
             if ((0 == MemberChanges) && (0 == FunctionChanges)) {
@@ -337,11 +336,11 @@ private:
                         boost::bind(&ScopeAnalysis::WasReferenced, &Analysis, _1));
                 unsigned int const FunctionAccess =
                     boost::count_if(
-                        MemberFunctions |
-                            boost::adaptors::filtered(IsMemberMethod()),
+                        MemberFunctions | boost::adaptors::filtered(IsMemberMethod()),
                         boost::bind(&ScopeAnalysis::WasReferenced, &Analysis, _1));
-                if ((0 == MemberAccess) && (0 == FunctionAccess)
-                && (! IsCXXThisExpr::Check(F->getBody()))) {
+                if ((0 == MemberAccess) && (0 == FunctionAccess) &&
+                    (! IsCXXThisExpr::Check(F->getBody()))
+                ) {
                     StaticCandidates.insert(F);
                 } else if (! F->isConst()) {
                     ConstCandidates.insert(F);

@@ -3,6 +3,7 @@
 set(ourlib_target Medve)
 
 set(ourlib_sources
+    UsageCollector.cpp
     ScopeAnalysis.cpp
     PluginMain.cpp
     ModuleAnalysis.cpp

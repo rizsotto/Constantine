@@ -3,9 +3,9 @@
 #ifndef _ScopeAnalysis_hpp_
 #define _ScopeAnalysis_hpp_
 
+#include <utility>
 #include <list>
 #include <map>
-#include <utility>
 
 #include <clang/AST/AST.h>
 #include <clang/Basic/Diagnostic.h>
