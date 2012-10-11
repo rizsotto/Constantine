@@ -11,10 +11,9 @@ Implemented functionalities
 Prerequisites
 -------------
 
-Clang 3.1 or a newer from SVN. Description for that you can find
-from [clang getting started][1].
+Clang from SVN. Description for that you can find from [clang getting started][1].
 
-r164964 (from trunk) is known to be working. (Mon,  1 Oct 2012)
+r165486 (from trunk) is known to be working. (Tue,  9 Oct 2012)
 
 How to build
 ------------
