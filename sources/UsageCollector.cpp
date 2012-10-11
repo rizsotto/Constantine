@@ -140,7 +140,8 @@ void DumpUsageMapEntry( ScopeAnalysis::UsageRefsMap::value_type const & Var
 
 
 UsageCollector::UsageCollector(ScopeAnalysis::UsageRefsMap & Out)
-    : Results(Out)
+    : boost::noncopyable()
+    , Results(Out)
 { }
 
 UsageCollector::~UsageCollector()
