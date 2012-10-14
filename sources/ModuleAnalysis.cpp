@@ -81,6 +81,56 @@ struct IsItFromMainModule {
 };
 
 
+// helper method to find DeclRefExpr
+clang::DeclRefExpr const * GetDeclRefExpr(clang::Expr const * E) {
+    // Strip away parentheses and casts we don't care about.
+    while (true) {
+        if (clang::ParenExpr const * const Paren = clang::dyn_cast<clang::ParenExpr const>(E)) {
+            E = Paren->getSubExpr();
+            continue;
+        }
+        if (clang::ImplicitCastExpr const * const ICE = clang::dyn_cast<clang::ImplicitCastExpr>(E)) {
+            if (ICE->getCastKind() == clang::CK_NoOp ||
+                ICE->getCastKind() == clang::CK_LValueToRValue ||
+                ICE->getCastKind() == clang::CK_DerivedToBase ||
+                ICE->getCastKind() == clang::CK_UncheckedDerivedToBase) {
+                E = ICE->getSubExpr();
+                continue;
+            }
+        }
+        if (clang::UnaryOperator const * const UnOp = clang::dyn_cast<clang::UnaryOperator const>(E)) {
+            E = UnOp->getSubExpr();
+            continue;
+        }
+        if (clang::MaterializeTemporaryExpr const * const M = clang::dyn_cast<clang::MaterializeTemporaryExpr>(E)) {
+            E = M->GetTemporaryExpr();
+            continue;
+        }
+        break;
+    }
+    return clang::dyn_cast<clang::DeclRefExpr>(E);
+}
+
+clang::DeclaratorDecl const * ReferedTo(clang::DeclaratorDecl const * const D) {
+    // check is it reference or pointer type
+    {
+        clang::QualType const & T = D->getType();
+        if (! ((*T).isReferenceType() || (*T).isPointerType())) {
+            return 0;
+        }
+    }
+    // check is it refer to a variable
+    if (clang::VarDecl const * const V = clang::dyn_cast<clang::VarDecl const>(D)) {
+        if (clang::Expr const * const Init = V->getInit()) {
+            if (clang::DeclRefExpr const * const Ref = GetDeclRefExpr(Init)) {
+                return clang::dyn_cast<clang::DeclaratorDecl const>(Ref->getDecl());
+            }
+        }
+    }
+    return 0;
+}
+
+
 // Pseudo constness analysis detects what variable can be declare as const.
 // This analysis runs through multiple scopes. We need to store the state of
 // the ongoing analysis. Once the variable was changed can't be const.
@@ -96,11 +146,13 @@ public:
         if (Analysis.WasChanged(V)) {
             Candidates.erase(V);
             Changed.insert(V);
-        } else if (Analysis.WasReferenced(V)) {
-            if (Changed.end() == Changed.find(V)) {
-                if (! IsConst(*V)) {
-                    Candidates.insert(V);
-                }
+            if (clang::DeclaratorDecl const * const Ref = ReferedTo(V)) {
+                Candidates.erase(Ref);
+                Changed.insert(Ref);
+            }
+        } else if (Changed.end() == Changed.find(V)) {
+            if (! IsConst(*V)) {
+                Candidates.insert(V);
             }
         }
     }
@@ -342,7 +394,7 @@ ModuleVisitor::Ptr ModuleVisitor::CreateVisitor(Target const State) {
 } // namespace anonymous
 
 
-ModuleAnalysis::ModuleAnalysis(clang::CompilerInstance const & Compiler, Target T)
+ModuleAnalysis::ModuleAnalysis(clang::CompilerInstance const & Compiler, Target const T)
     : boost::noncopyable()
     , clang::ASTConsumer()
     , Reporter(Compiler.getDiagnostics())
@@ -350,7 +402,7 @@ ModuleAnalysis::ModuleAnalysis(clang::CompilerInstance const & Compiler, Target 
 { }
 
 void ModuleAnalysis::HandleTranslationUnit(clang::ASTContext & Ctx) {
-    ModuleVisitor::Ptr V = ModuleVisitor::CreateVisitor(State);
+    ModuleVisitor::Ptr const V = ModuleVisitor::CreateVisitor(State);
     V->TraverseDecl(Ctx.getTranslationUnitDecl());
     V->Dump(Reporter);
 }
