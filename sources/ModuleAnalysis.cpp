@@ -81,10 +81,9 @@ struct IsItFromMainModule {
 };
 
 
-// helper method to find DeclRefExpr
-clang::DeclRefExpr const * GetDeclRefExpr(clang::Expr const * E) {
-    // Strip away parentheses and casts we don't care about.
-    while (true) {
+// Strip away parentheses and casts we don't care about.
+clang::Expr const * StripExpr(clang::Expr const * E) {
+    while (E) {
         if (clang::ParenExpr const * const Paren = clang::dyn_cast<clang::ParenExpr const>(E)) {
             E = Paren->getSubExpr();
             continue;
@@ -108,7 +107,7 @@ clang::DeclRefExpr const * GetDeclRefExpr(clang::Expr const * E) {
         }
         break;
     }
-    return clang::dyn_cast<clang::DeclRefExpr>(E);
+    return E;
 }
 
 clang::DeclaratorDecl const * ReferedTo(clang::DeclaratorDecl const * const D) {
@@ -121,10 +120,17 @@ clang::DeclaratorDecl const * ReferedTo(clang::DeclaratorDecl const * const D) {
     }
     // check is it refer to a variable
     if (clang::VarDecl const * const V = clang::dyn_cast<clang::VarDecl const>(D)) {
-        if (clang::Expr const * const Init = V->getInit()) {
-            if (clang::DeclRefExpr const * const Ref = GetDeclRefExpr(Init)) {
-                return clang::dyn_cast<clang::DeclaratorDecl const>(Ref->getDecl());
-            }
+        if (clang::Expr const * const E = StripExpr(V->getInit())) {
+            clang::ValueDecl const * const RefVal =
+                (clang::dyn_cast<clang::DeclRefExpr const>(E))
+                    ? clang::dyn_cast<clang::DeclRefExpr const>(E)->getDecl()
+                    : (clang::dyn_cast<clang::MemberExpr const>(E))
+                        ? clang::dyn_cast<clang::MemberExpr const>(E)->getMemberDecl()
+                        : 0;
+            return
+                (RefVal)
+                    ? clang::dyn_cast<clang::DeclaratorDecl const>(RefVal)
+                    : 0;
         }
     }
     return 0;
