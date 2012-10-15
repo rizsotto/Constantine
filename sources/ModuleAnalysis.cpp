@@ -81,62 +81,6 @@ struct IsItFromMainModule {
 };
 
 
-// Strip away parentheses and casts we don't care about.
-clang::Expr const * StripExpr(clang::Expr const * E) {
-    while (E) {
-        if (clang::ParenExpr const * const Paren = clang::dyn_cast<clang::ParenExpr const>(E)) {
-            E = Paren->getSubExpr();
-            continue;
-        }
-        if (clang::ImplicitCastExpr const * const ICE = clang::dyn_cast<clang::ImplicitCastExpr>(E)) {
-            if (ICE->getCastKind() == clang::CK_NoOp ||
-                ICE->getCastKind() == clang::CK_LValueToRValue ||
-                ICE->getCastKind() == clang::CK_DerivedToBase ||
-                ICE->getCastKind() == clang::CK_UncheckedDerivedToBase) {
-                E = ICE->getSubExpr();
-                continue;
-            }
-        }
-        if (clang::UnaryOperator const * const UnOp = clang::dyn_cast<clang::UnaryOperator const>(E)) {
-            E = UnOp->getSubExpr();
-            continue;
-        }
-        if (clang::MaterializeTemporaryExpr const * const M = clang::dyn_cast<clang::MaterializeTemporaryExpr>(E)) {
-            E = M->GetTemporaryExpr();
-            continue;
-        }
-        break;
-    }
-    return E;
-}
-
-clang::DeclaratorDecl const * ReferedTo(clang::DeclaratorDecl const * const D) {
-    // check is it reference or pointer type
-    {
-        clang::QualType const & T = D->getType();
-        if (! ((*T).isReferenceType() || (*T).isPointerType())) {
-            return 0;
-        }
-    }
-    // check is it refer to a variable
-    if (clang::VarDecl const * const V = clang::dyn_cast<clang::VarDecl const>(D)) {
-        if (clang::Expr const * const E = StripExpr(V->getInit())) {
-            clang::ValueDecl const * const RefVal =
-                (clang::dyn_cast<clang::DeclRefExpr const>(E))
-                    ? clang::dyn_cast<clang::DeclRefExpr const>(E)->getDecl()
-                    : (clang::dyn_cast<clang::MemberExpr const>(E))
-                        ? clang::dyn_cast<clang::MemberExpr const>(E)->getMemberDecl()
-                        : 0;
-            return
-                (RefVal)
-                    ? clang::dyn_cast<clang::DeclaratorDecl const>(RefVal)
-                    : 0;
-        }
-    }
-    return 0;
-}
-
-
 // Pseudo constness analysis detects what variable can be declare as const.
 // This analysis runs through multiple scopes. We need to store the state of
 // the ongoing analysis. Once the variable was changed can't be const.
@@ -150,12 +94,9 @@ public:
 
     void Eval(ScopeAnalysis const & Analysis, clang::DeclaratorDecl const * const V) {
         if (Analysis.WasChanged(V)) {
-            Candidates.erase(V);
-            Changed.insert(V);
-            if (clang::DeclaratorDecl const * const Ref = ReferedTo(V)) {
-                Candidates.erase(Ref);
-                Changed.insert(Ref);
-            }
+            RegisterChange(V);
+            boost::for_each(GetReferedVariables(V),
+                boost::bind(&PseudoConstnessAnalysisState::RegisterChange, this, _1));
         } else if (Changed.end() == Changed.find(V)) {
             if (! IsConst(*V)) {
                 Candidates.insert(V);
@@ -171,6 +112,11 @@ public:
 private:
     static bool IsConst(clang::DeclaratorDecl const & D) {
         return (D.getType().getNonReferenceType().isConstQualified());
+    }
+
+    void RegisterChange(clang::DeclaratorDecl const * const V) {
+        Candidates.erase(V);
+        Changed.insert(V);
     }
 
 private:
@@ -305,7 +251,7 @@ private:
     void OnCXXMethodDecl(clang::CXXMethodDecl const * const F) {
         clang::CXXRecordDecl const * const RecordDecl =
             F->getParent()->getCanonicalDecl();
-        Variables const MemberVariables = GetVariablesFromRecord(RecordDecl);
+        Variables const MemberVariables = GetMemberVariablesAndReferences(RecordDecl, F);
         // check variables first,
         ScopeAnalysis const & Analysis = ScopeAnalysis::AnalyseThis(*(F->getBody()));
         boost::for_each(GetVariablesFromContext(F, F->isVirtual()),

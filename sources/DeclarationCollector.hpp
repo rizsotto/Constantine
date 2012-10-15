@@ -19,4 +19,11 @@ Variables GetVariablesFromRecord(clang::CXXRecordDecl const * const Rec);
 // method to copy methods out from class declaration 
 Methods GetMethodsFromRecord(clang::CXXRecordDecl const * const Rec);
 
+
+// method to get refered declarations from the given declaration
+Variables GetReferedVariables(clang::DeclaratorDecl const *);
+
+// method to get all member variables and all refered declarations
+Variables GetMemberVariablesAndReferences(clang::CXXRecordDecl const * const Rec, clang::DeclContext const * const F);
+
 #endif // _DeclarationCollector_hpp_

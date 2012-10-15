@@ -34,6 +34,62 @@ bool GetMethodsFromRecord(clang::CXXRecordDecl const * const Rec, void * State) 
     return true;
 }
 
+// Strip away parentheses and casts we don't care about.
+clang::Expr const * StripExpr(clang::Expr const * E) {
+    while (E) {
+        if (clang::ParenExpr const * const Paren = clang::dyn_cast<clang::ParenExpr const>(E)) {
+            E = Paren->getSubExpr();
+            continue;
+        }
+        if (clang::ImplicitCastExpr const * const ICE = clang::dyn_cast<clang::ImplicitCastExpr>(E)) {
+            if (ICE->getCastKind() == clang::CK_NoOp ||
+                ICE->getCastKind() == clang::CK_LValueToRValue ||
+                ICE->getCastKind() == clang::CK_DerivedToBase ||
+                ICE->getCastKind() == clang::CK_UncheckedDerivedToBase) {
+                E = ICE->getSubExpr();
+                continue;
+            }
+        }
+        if (clang::UnaryOperator const * const UnOp = clang::dyn_cast<clang::UnaryOperator const>(E)) {
+            E = UnOp->getSubExpr();
+            continue;
+        }
+        if (clang::MaterializeTemporaryExpr const * const M = clang::dyn_cast<clang::MaterializeTemporaryExpr>(E)) {
+            E = M->GetTemporaryExpr();
+            continue;
+        }
+        break;
+    }
+    return E;
+}
+
+clang::DeclaratorDecl const * ReferedTo(clang::DeclaratorDecl const * const D) {
+    // check is it reference or pointer type
+    {
+        clang::QualType const & T = D->getType();
+        if (! ((*T).isReferenceType() || (*T).isPointerType())) {
+            return 0;
+        }
+    }
+    // check is it refer to a variable
+    if (clang::VarDecl const * const V = clang::dyn_cast<clang::VarDecl const>(D)) {
+        if (clang::Expr const * const E = StripExpr(V->getInit())) {
+            clang::ValueDecl const * const RefVal =
+                (clang::dyn_cast<clang::DeclRefExpr const>(E))
+                    ? clang::dyn_cast<clang::DeclRefExpr const>(E)->getDecl()
+                    : (clang::dyn_cast<clang::MemberExpr const>(E))
+                        ? clang::dyn_cast<clang::MemberExpr const>(E)->getMemberDecl()
+                        : 0;
+            return
+                (RefVal)
+                    ? clang::dyn_cast<clang::DeclaratorDecl const>(RefVal)
+                    : 0;
+        }
+    }
+    return 0;
+}
+
+
 } // namespace anonymous
 
 Variables GetVariablesFromContext(clang::DeclContext const * const F, bool const WithoutArgs) {
@@ -62,3 +118,26 @@ Methods GetMethodsFromRecord(clang::CXXRecordDecl const * const Rec) {
     return Result;
 }
 
+Variables GetReferedVariables(clang::DeclaratorDecl const * D) {
+    Variables Result;
+    while (D = ReferedTo(D)) {
+        Result.insert(D);
+    }
+    return Result;
+}
+
+Variables GetMemberVariablesAndReferences(clang::CXXRecordDecl const * const Rec, clang::DeclContext const * const F) {
+    Variables Members = GetVariablesFromRecord(Rec);
+    Variables const & Locals = GetVariablesFromContext(F);
+    for (Variables::const_iterator LoIt(Locals.begin()), LoEnd(Locals.end()); LoIt != LoEnd; ++LoIt) {
+        Variables const & Refs = GetReferedVariables(*LoIt);
+        for (Variables::const_iterator ReIt(Refs.begin()), ReEnd(Refs.end()); ReIt != ReEnd; ++ReIt) {
+            if (Members.count(*ReIt)) {
+                Members.insert(Refs.begin(), Refs.end());
+                Members.insert(*LoIt);
+                break;
+            }
+        }
+    }
+    return Members;
+}
