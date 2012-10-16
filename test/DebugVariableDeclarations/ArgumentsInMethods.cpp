@@ -2,6 +2,8 @@
 
 class A {
 
+    A(int & k) { }
+
     void f1() {
     }
 

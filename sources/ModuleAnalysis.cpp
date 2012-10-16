@@ -80,6 +80,16 @@ struct IsItFromMainModule {
     }
 };
 
+bool IsJustAMethod(clang::CXXMethodDecl const * const F) {
+    return
+        (F->isUserProvided())
+    &&  (! F->isVirtual())
+    &&  (! F->isCopyAssignmentOperator())
+    &&  (0 == clang::dyn_cast<clang::CXXConstructorDecl const>(F))
+    &&  (0 == clang::dyn_cast<clang::CXXConversionDecl const>(F))
+    &&  (0 == clang::dyn_cast<clang::CXXDestructorDecl const>(F));
+}
+
 
 // Pseudo constness analysis detects what variable can be declare as const.
 // This analysis runs through multiple scopes. We need to store the state of
@@ -193,7 +203,7 @@ private:
     }
 
     void OnCXXMethodDecl(clang::CXXMethodDecl const * const F) {
-        boost::copy(GetVariablesFromContext(F, F->isVirtual()),
+        boost::copy(GetVariablesFromContext(F, (! IsJustAMethod(F))),
             std::insert_iterator<Variables>(Result, Result.begin()));
         boost::copy(GetVariablesFromRecord(F->getParent()->getCanonicalDecl()),
             std::insert_iterator<Variables>(Result, Result.begin()));
@@ -254,7 +264,7 @@ private:
         Variables const MemberVariables = GetMemberVariablesAndReferences(RecordDecl, F);
         // check variables first,
         ScopeAnalysis const & Analysis = ScopeAnalysis::AnalyseThis(*(F->getBody()));
-        boost::for_each(GetVariablesFromContext(F, (F->isVirtual()) || (! IsCXXMethodDeclOnly(F))),
+        boost::for_each(GetVariablesFromContext(F, (! IsJustAMethod(F))),
             boost::bind(&PseudoConstnessAnalysisState::Eval, &State, boost::cref(Analysis), _1));
         boost::for_each(MemberVariables,
             boost::bind(&PseudoConstnessAnalysisState::Eval, &State, boost::cref(Analysis), _1));
@@ -262,7 +272,7 @@ private:
         if ((! F->isVirtual()) &&
             (! F->isStatic()) &&
             F->isUserProvided() &&
-            IsCXXMethodDeclOnly(F)
+            IsJustAMethod(F)
         ) {
             Methods const MemberFunctions = GetMethodsFromRecord(RecordDecl);
             // check the constness first..
@@ -313,13 +323,6 @@ private:
             return (! F->isStatic());
         }
     };
-
-    static bool IsCXXMethodDeclOnly(clang::CXXMethodDecl const * const F) {
-        return
-            (0 == clang::dyn_cast<clang::CXXConstructorDecl const>(F))
-        &&  (0 == clang::dyn_cast<clang::CXXConversionDecl const>(F))
-        &&  (0 == clang::dyn_cast<clang::CXXDestructorDecl const>(F));
-    }
 
 private:
     PseudoConstnessAnalysisState State;

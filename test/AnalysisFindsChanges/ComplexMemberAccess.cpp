@@ -40,4 +40,7 @@ void member_access_test() {
 
     a.SetValue(0); // expected-note {{variable 'a' with type 'struct A' was changed}}
     b.Inside.SetValue(0); // expected-note {{variable 'b' with type 'struct B' was changed}}
+
+    b.Inside.Value += 1; // expected-note {{variable 'b' with type 'struct B' was changed}}
+    a.Value += 1; // expected-note {{variable 'a' with type 'struct A' was changed}}
 }
