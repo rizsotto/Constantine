@@ -254,7 +254,7 @@ private:
         Variables const MemberVariables = GetMemberVariablesAndReferences(RecordDecl, F);
         // check variables first,
         ScopeAnalysis const & Analysis = ScopeAnalysis::AnalyseThis(*(F->getBody()));
-        boost::for_each(GetVariablesFromContext(F, F->isVirtual()),
+        boost::for_each(GetVariablesFromContext(F, (F->isVirtual()) || (! IsCXXMethodDeclOnly(F))),
             boost::bind(&PseudoConstnessAnalysisState::Eval, &State, boost::cref(Analysis), _1));
         boost::for_each(MemberVariables,
             boost::bind(&PseudoConstnessAnalysisState::Eval, &State, boost::cref(Analysis), _1));
