@@ -63,6 +63,19 @@ clang::Expr const * StripExpr(clang::Expr const * E) {
     return E;
 }
 
+// Dig into member variable access to register the outer variable
+clang::ValueDecl const * DigIntoMemberExpr(clang::MemberExpr const * E) {
+    while (E) {
+        clang::Expr const * const Child = E->getBase();
+        if (clang::MemberExpr const * const Candidate = clang::dyn_cast<clang::MemberExpr const>(Child)) {
+            E = Candidate;
+            continue;
+        }
+        break;
+    }
+    return E->getMemberDecl();
+}
+
 clang::DeclaratorDecl const * ReferedTo(clang::DeclaratorDecl const * const D) {
     // check is it reference or pointer type
     {
@@ -73,12 +86,13 @@ clang::DeclaratorDecl const * ReferedTo(clang::DeclaratorDecl const * const D) {
     }
     // check is it refer to a variable
     if (clang::VarDecl const * const V = clang::dyn_cast<clang::VarDecl const>(D)) {
+        // get the initialization expression
         if (clang::Expr const * const E = StripExpr(V->getInit())) {
             clang::ValueDecl const * const RefVal =
                 (clang::dyn_cast<clang::DeclRefExpr const>(E))
                     ? clang::dyn_cast<clang::DeclRefExpr const>(E)->getDecl()
                     : (clang::dyn_cast<clang::MemberExpr const>(E))
-                        ? clang::dyn_cast<clang::MemberExpr const>(E)->getMemberDecl()
+                        ? DigIntoMemberExpr(clang::dyn_cast<clang::MemberExpr const>(E))
                         : 0;
             return
                 (RefVal)
@@ -120,7 +134,7 @@ Methods GetMethodsFromRecord(clang::CXXRecordDecl const * const Rec) {
 
 Variables GetReferedVariables(clang::DeclaratorDecl const * D) {
     Variables Result;
-    while (D = ReferedTo(D)) {
+    while ((D = ReferedTo(D))) {
         Result.insert(D);
     }
     return Result;
