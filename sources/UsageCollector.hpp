@@ -5,13 +5,15 @@
 
 #include "ScopeAnalysis.hpp"
 
+#include <boost/noncopyable.hpp>
 #include <clang/AST/AST.h>
 #include <clang/AST/RecursiveASTVisitor.h>
 
 
 // Collect variable usages. One variable could have been used multiple
 // times with different constness of the given type.
-class UsageCollector {
+class UsageCollector
+    : public boost::noncopyable {
 protected:
     UsageCollector(ScopeAnalysis::UsageRefsMap & Out);
     virtual ~UsageCollector();

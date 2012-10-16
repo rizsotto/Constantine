@@ -94,13 +94,12 @@ public:
 
     void Eval(ScopeAnalysis const & Analysis, clang::DeclaratorDecl const * const V) {
         if (Analysis.WasChanged(V)) {
-            Candidates.erase(V);
-            Changed.insert(V);
-        } else if (Analysis.WasReferenced(V)) {
-            if (Changed.end() == Changed.find(V)) {
-                if (! IsConst(*V)) {
-                    Candidates.insert(V);
-                }
+            RegisterChange(V);
+            boost::for_each(GetReferedVariables(V),
+                boost::bind(&PseudoConstnessAnalysisState::RegisterChange, this, _1));
+        } else if (Changed.end() == Changed.find(V)) {
+            if (! IsConst(*V)) {
+                Candidates.insert(V);
             }
         }
     }
@@ -113,6 +112,11 @@ public:
 private:
     static bool IsConst(clang::DeclaratorDecl const & D) {
         return (D.getType().getNonReferenceType().isConstQualified());
+    }
+
+    void RegisterChange(clang::DeclaratorDecl const * const V) {
+        Candidates.erase(V);
+        Changed.insert(V);
     }
 
 private:
@@ -247,7 +251,7 @@ private:
     void OnCXXMethodDecl(clang::CXXMethodDecl const * const F) {
         clang::CXXRecordDecl const * const RecordDecl =
             F->getParent()->getCanonicalDecl();
-        Variables const MemberVariables = GetVariablesFromRecord(RecordDecl);
+        Variables const MemberVariables = GetMemberVariablesAndReferences(RecordDecl, F);
         // check variables first,
         ScopeAnalysis const & Analysis = ScopeAnalysis::AnalyseThis(*(F->getBody()));
         boost::for_each(GetVariablesFromContext(F, F->isVirtual()),
@@ -342,7 +346,7 @@ ModuleVisitor::Ptr ModuleVisitor::CreateVisitor(Target const State) {
 } // namespace anonymous
 
 
-ModuleAnalysis::ModuleAnalysis(clang::CompilerInstance const & Compiler, Target T)
+ModuleAnalysis::ModuleAnalysis(clang::CompilerInstance const & Compiler, Target const T)
     : boost::noncopyable()
     , clang::ASTConsumer()
     , Reporter(Compiler.getDiagnostics())
@@ -350,7 +354,7 @@ ModuleAnalysis::ModuleAnalysis(clang::CompilerInstance const & Compiler, Target 
 { }
 
 void ModuleAnalysis::HandleTranslationUnit(clang::ASTContext & Ctx) {
-    ModuleVisitor::Ptr V = ModuleVisitor::CreateVisitor(State);
+    ModuleVisitor::Ptr const V = ModuleVisitor::CreateVisitor(State);
     V->TraverseDecl(Ctx.getTranslationUnitDecl());
     V->Dump(Reporter);
 }

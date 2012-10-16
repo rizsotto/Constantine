@@ -87,8 +87,16 @@ public:
         return true;
     }
 
-    bool VisitMemberExpr(clang::MemberExpr const * const Expr) {
+    bool VisitMemberExpr(clang::MemberExpr const * Expr) {
         if (IsCXXThisExpr::Check(Expr->getBase())) {
+            while (true) {
+                clang::Expr const * const Child = Expr->getBase();
+                if (clang::MemberExpr const * const Candidate = clang::dyn_cast<clang::MemberExpr const>(Child)) {
+                    Expr = Candidate;
+                    continue;
+                }
+                break;
+            }
             SetVariable(Expr->getMemberDecl());
             SetType(Expr->getType());
         }
@@ -140,7 +148,8 @@ void DumpUsageMapEntry( ScopeAnalysis::UsageRefsMap::value_type const & Var
 
 
 UsageCollector::UsageCollector(ScopeAnalysis::UsageRefsMap & Out)
-    : Results(Out)
+    : boost::noncopyable()
+    , Results(Out)
 { }
 
 UsageCollector::~UsageCollector()
