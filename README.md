@@ -24,5 +24,16 @@ in your `PATH`. Or pass `LLVM_PATH` environment variable at cmake step.
 * `cmake .. && make`
 * To run test suite `make check`
 
+How to use
+----------
+
+Set your compiler to `clang` and pass some plugin related flags.
+
+```shell
+$ export CC="$LLVM_HOME/clang"
+$ export CXX="$LLVM_HOME/clang++"
+$ export CXXFLAGS="-Xclang -load -Xclang $MEDVE_PATH/libMedve.so -Xclang -add-plugin -Xclang medve"
+```
+
 [1]: http://clang.llvm.org/get_started.html     "clang getting started"
 
