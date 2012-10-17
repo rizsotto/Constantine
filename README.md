@@ -1,7 +1,7 @@
-Medve
-=====
+Constantine
+===========
 
-Medve is a toy project to learn how to write clang plugin.
+Constantine is a toy project to learn how to write clang plugin.
 
 Implemented functionalities
 ---------------------------
@@ -32,7 +32,7 @@ Set your compiler to `clang` and pass some plugin related flags.
 ```shell
 $ export CC="$LLVM_HOME/clang"
 $ export CXX="$LLVM_HOME/clang++"
-$ export CXXFLAGS="-Xclang -load -Xclang $MEDVE_PATH/libMedve.so -Xclang -add-plugin -Xclang medve"
+$ export CXXFLAGS="-Xclang -load -Xclang $MEDVE_PATH/libconstantine.so -Xclang -add-plugin -Xclang constatntine"
 ```
 
 [1]: http://clang.llvm.org/get_started.html     "clang getting started"

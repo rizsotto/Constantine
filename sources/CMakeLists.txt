@@ -1,6 +1,6 @@
 # Copyright 2012 by Laszlo Nagy [see file MIT-LICENSE]
 
-set(ourlib_target Medve)
+set(ourlib_target constantine)
 
 set(ourlib_sources
     UsageCollector.cpp
@@ -21,7 +21,7 @@ add_definitions(${CLANG_DEFINITIONS})
 set_target_properties(${ourlib_target} PROPERTIES
     LINKER_LANGUAGE CXX)
 set_target_properties(${ourlib_target} PROPERTIES
-    SOVERSION 0.3)
+    SOVERSION 1.0)
 set_target_properties(${ourlib_target} PROPERTIES
     PREFIX "lib")
 set_target_properties(${ourlib_target} PROPERTIES
