@@ -41,21 +41,20 @@ clang::Expr const * StripExpr(clang::Expr const * E) {
             E = Paren->getSubExpr();
             continue;
         }
-        if (clang::ImplicitCastExpr const * const ICE = clang::dyn_cast<clang::ImplicitCastExpr>(E)) {
-            if (ICE->getCastKind() == clang::CK_NoOp ||
-                ICE->getCastKind() == clang::CK_LValueToRValue ||
-                ICE->getCastKind() == clang::CK_DerivedToBase ||
-                ICE->getCastKind() == clang::CK_UncheckedDerivedToBase) {
-                E = ICE->getSubExpr();
-                continue;
-            }
+        if (clang::ImplicitCastExpr const * const ICE = clang::dyn_cast<clang::ImplicitCastExpr const>(E)) {
+            E = ICE->getSubExpr();
+            continue;
         }
         if (clang::UnaryOperator const * const UnOp = clang::dyn_cast<clang::UnaryOperator const>(E)) {
             E = UnOp->getSubExpr();
             continue;
         }
-        if (clang::MaterializeTemporaryExpr const * const M = clang::dyn_cast<clang::MaterializeTemporaryExpr>(E)) {
+        if (clang::MaterializeTemporaryExpr const * const M = clang::dyn_cast<clang::MaterializeTemporaryExpr const>(E)) {
             E = M->GetTemporaryExpr();
+            continue;
+        }
+        if (clang::ArraySubscriptExpr const * const ASE = clang::dyn_cast<clang::ArraySubscriptExpr const>(E)) {
+            E = ASE->getBase();
             continue;
         }
         break;
