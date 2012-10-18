@@ -51,13 +51,19 @@ public:
     }
 
     bool VisitCallExpr(clang::CallExpr const * const Stmt) {
+        // the implimentation relies on that here the first argument
+        // is the 'this' for operator calls, but not for the CXXMethodDecl.
+        unsigned int const Offset =
+            (clang::dyn_cast<clang::CXXOperatorCallExpr const>(Stmt)) ? 1 : 0;
+
         if (clang::FunctionDecl const * const F = Stmt->getDirectCallee()) {
             // check the function parameters one by one
             int const Args = std::min(Stmt->getNumArgs(), F->getNumParams());
             for (int It = 0; It < Args; ++It) {
                 clang::ParmVarDecl const * const P = F->getParamDecl(It);
                 if (IsNonConstReferenced(P->getType())) {
-                    AddToResults(Stmt->getArg(It), (*(P->getType())).getPointeeType());
+                    assert(It + Offset <= Stmt->getNumArgs());
+                    AddToResults(Stmt->getArg(It + Offset), (*(P->getType())).getPointeeType());
                 }
             }
         }
@@ -76,7 +82,7 @@ public:
 
     // Objects are mutated when non const operator called.
     bool VisitCXXOperatorCallExpr(clang::CXXOperatorCallExpr const * const Stmt) {
-        // this implimentation relies on that here the first argument
+        // the implimentation relies on that here the first argument
         // is the 'this', while it was not the case with CXXMethodDecl.
         if (clang::FunctionDecl const * const F = Stmt->getDirectCallee()) {
             if (clang::CXXMethodDecl const * const MD = clang::dyn_cast<clang::CXXMethodDecl const>(F)) {
