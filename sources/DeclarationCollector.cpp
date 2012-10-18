@@ -88,16 +88,17 @@ clang::DeclaratorDecl const * ReferedTo(clang::DeclaratorDecl const * const D) {
     if (clang::VarDecl const * const V = clang::dyn_cast<clang::VarDecl const>(D)) {
         // get the initialization expression
         if (clang::Expr const * const E = StripExpr(V->getInit())) {
-            clang::ValueDecl const * const RefVal =
-                (clang::dyn_cast<clang::DeclRefExpr const>(E))
-                    ? clang::dyn_cast<clang::DeclRefExpr const>(E)->getDecl()
-                    : (clang::dyn_cast<clang::MemberExpr const>(E))
-                        ? DigIntoMemberExpr(clang::dyn_cast<clang::MemberExpr const>(E))
-                        : 0;
-            return
-                (RefVal)
-                    ? clang::dyn_cast<clang::DeclaratorDecl const>(RefVal)
-                    : 0;
+            clang::ValueDecl const * RefVal = 0;
+
+            if (clang::DeclRefExpr const * const RE = clang::dyn_cast<clang::DeclRefExpr const>(E)) {
+                RefVal = RE->getDecl();
+            } else if (clang::MemberExpr const * const ME = clang::dyn_cast<clang::MemberExpr const>(E)) {
+                RefVal = DigIntoMemberExpr(ME);
+            }
+
+            if (RefVal) {
+                return clang::dyn_cast<clang::DeclaratorDecl const>(RefVal);
+            }
         }
     }
     return 0;
