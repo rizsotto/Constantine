@@ -50,11 +50,17 @@ public:
         return true;
     }
 
+    static bool HasThisAsFirstArgument(clang::CallExpr const * const Stmt) {
+        return
+            (clang::dyn_cast<clang::CXXOperatorCallExpr const>(Stmt)) &&
+            (Stmt->getDirectCallee()) &&
+            (clang::dyn_cast<clang::CXXMethodDecl const>(Stmt->getDirectCallee()));
+    }
+
     bool VisitCallExpr(clang::CallExpr const * const Stmt) {
         // the implimentation relies on that here the first argument
         // is the 'this' for operator calls, but not for the CXXMethodDecl.
-        unsigned int const Offset =
-            (clang::dyn_cast<clang::CXXOperatorCallExpr const>(Stmt)) ? 1 : 0;
+        unsigned int const Offset = HasThisAsFirstArgument(Stmt) ? 1 : 0;
 
         if (clang::FunctionDecl const * const F = Stmt->getDirectCallee()) {
             // check the function parameters one by one
