@@ -32,7 +32,7 @@ Set your compiler to `clang` and pass some plugin related flags.
 ```shell
 $ export CC="$LLVM_HOME/clang"
 $ export CXX="$LLVM_HOME/clang++"
-$ export CXXFLAGS="-Xclang -load -Xclang $MEDVE_PATH/libconstantine.so -Xclang -add-plugin -Xclang constatntine"
+$ export CXXFLAGS="-Xclang -load -Xclang $MEDVE_PATH/libconstantine.so -Xclang -add-plugin -Xclang constantine"
 ```
 
 [1]: http://clang.llvm.org/get_started.html     "clang getting started"
