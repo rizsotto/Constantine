@@ -41,8 +41,8 @@ clang::Expr const * StripExpr(clang::Expr const * E) {
             E = Paren->getSubExpr();
             continue;
         }
-        if (clang::ImplicitCastExpr const * const ICE = clang::dyn_cast<clang::ImplicitCastExpr const>(E)) {
-            E = ICE->getSubExpr();
+        if (clang::CastExpr const * const CE = clang::dyn_cast<clang::CastExpr const>(E)) {
+            E = CE->getSubExpr();
             continue;
         }
         if (clang::UnaryOperator const * const UnOp = clang::dyn_cast<clang::UnaryOperator const>(E)) {

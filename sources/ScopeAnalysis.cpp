@@ -100,6 +100,16 @@ public:
         return true;
     }
 
+    // Placement new change change the pre allocated memory.
+    bool VisitCXXNewExpr(clang::CXXNewExpr const * const Stmt) {
+        unsigned int const Args = Stmt->getNumPlacementArgs();
+        for (unsigned int It = 0; It < Args; ++It) {
+            // FIXME: not all placement argument are mutating.
+            AddToResults(Stmt->getPlacementArg(It));
+        }
+        return true;
+    }
+
 private:
     static bool IsNonConstReferenced(clang::QualType const & Decl) {
         return
