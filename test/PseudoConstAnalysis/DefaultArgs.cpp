@@ -1,4 +1,5 @@
 // RUN: %clang_cc1 %s -fsyntax-only -verify
+// expected-no-diagnostics
 
 void mutator(int & i, int * j = 0) {
     if (j) {
