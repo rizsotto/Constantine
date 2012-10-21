@@ -40,36 +40,34 @@ public:
     bool VisitCXXConstructExpr(clang::CXXConstructExpr const * const Stmt) {
         clang::CXXConstructorDecl const * const F = Stmt->getConstructor();
         // check the function parameters one by one
-        int const Args = std::min(Stmt->getNumArgs(), F->getNumParams());
-        for (int It = 0; It < Args; ++It) {
+        unsigned int const Args =
+            std::min(Stmt->getNumArgs(), F->getNumParams());
+        for (unsigned int It = 0; It < Args; ++It) {
             clang::ParmVarDecl const * const P = F->getParamDecl(It);
             if (IsNonConstReferenced(P->getType())) {
-                AddToResults(Stmt->getArg(It), (*(P->getType())).getPointeeType());
+                AddToResults(Stmt->getArg(It),
+                             (*(P->getType())).getPointeeType());
             }
         }
         return true;
     }
 
-    static bool HasThisAsFirstArgument(clang::CallExpr const * const Stmt) {
-        return
-            (clang::dyn_cast<clang::CXXOperatorCallExpr const>(Stmt)) &&
-            (Stmt->getDirectCallee()) &&
-            (clang::dyn_cast<clang::CXXMethodDecl const>(Stmt->getDirectCallee()));
-    }
-
+    // Arguments potentially mutated when you pass by-pointer or by-reference.
     bool VisitCallExpr(clang::CallExpr const * const Stmt) {
-        // the implimentation relies on that here the first argument
-        // is the 'this' for operator calls, but not for the CXXMethodDecl.
+        // some function call is a member call and has 'this' as a first
+        // argument, which is not checked here.
         unsigned int const Offset = HasThisAsFirstArgument(Stmt) ? 1 : 0;
 
         if (clang::FunctionDecl const * const F = Stmt->getDirectCallee()) {
             // check the function parameters one by one
-            int const Args = std::min(Stmt->getNumArgs(), F->getNumParams());
-            for (int It = 0; It < Args; ++It) {
+            unsigned int const Args =
+                std::min(Stmt->getNumArgs(), F->getNumParams());
+            for (unsigned int It = 0; It < Args; ++It) {
                 clang::ParmVarDecl const * const P = F->getParamDecl(It);
                 if (IsNonConstReferenced(P->getType())) {
                     assert(It + Offset <= Stmt->getNumArgs());
-                    AddToResults(Stmt->getArg(It + Offset), (*(P->getType())).getPointeeType());
+                    AddToResults(Stmt->getArg(It + Offset),
+                                 (*(P->getType())).getPointeeType());
                 }
             }
         }
@@ -107,6 +105,13 @@ private:
         return
             ((*Decl).isReferenceType() || (*Decl).isPointerType())
             && (! (*Decl).getPointeeType().isConstQualified());
+    }
+
+    static bool HasThisAsFirstArgument(clang::CallExpr const * const Stmt) {
+        return
+            (clang::dyn_cast<clang::CXXOperatorCallExpr const>(Stmt)) &&
+            (Stmt->getDirectCallee()) &&
+            (clang::dyn_cast<clang::CXXMethodDecl const>(Stmt->getDirectCallee()));
     }
 
 public:
