@@ -2,6 +2,10 @@
 
 #include "DeclarationCollector.hpp"
 
+#include <boost/bind.hpp>
+#include <boost/range.hpp>
+#include <boost/range/algorithm/transform.hpp>
+
 namespace {
 
 void GetVariablesFromRecord(clang::CXXRecordDecl const & Rec, Variables & Out) {
@@ -62,49 +66,56 @@ clang::Expr const * StripExpr(clang::Expr const * E) {
     return E;
 }
 
-// Dig into member variable access to register the outer variable
-clang::ValueDecl const * DigIntoMemberExpr(clang::MemberExpr const * E) {
-    while (E) {
-        clang::Expr const * const Child = E->getBase();
-        if (clang::MemberExpr const * const Candidate = clang::dyn_cast<clang::MemberExpr const>(Child)) {
-            E = Candidate;
-            continue;
+std::set<clang::Expr const *> CollectRefereeExpr(clang::Expr const * const E) {
+    std::set<clang::Expr const *> Result;
+
+    std::set<clang::Expr const *> Works;
+    Works.insert(E);
+
+    while (! Works.empty()) {
+        clang::Expr const * const Current = *(Works.begin());
+        Works.erase(Works.begin());
+
+        if (clang::Expr const * const Stripped = StripExpr(Current)) {
+            if (clang::dyn_cast<clang::DeclRefExpr const>(Stripped)) {
+                Result.insert(Stripped);
+            } else if (clang::MemberExpr const * ME = clang::dyn_cast<clang::MemberExpr const>(Stripped)) {
+                // Dig into member variable access to register the outer variable
+                while (ME) {
+                    clang::Expr const * const Child = ME->getBase();
+                    if (clang::MemberExpr const * const Candidate = clang::dyn_cast<clang::MemberExpr const>(Child)) {
+                        ME = Candidate;
+                        continue;
+                    }
+                    break;
+                }
+                Result.insert(ME);
+            } else if (clang::AbstractConditionalOperator const * const ACO = clang::dyn_cast<clang::AbstractConditionalOperator const>(Stripped)) {
+                Works.insert(ACO->getTrueExpr());
+                Works.insert(ACO->getFalseExpr());
+            }
         }
-        break;
     }
-    return E->getMemberDecl();
+    return Result;
 }
 
-clang::DeclaratorDecl const * ReferedTo(clang::DeclaratorDecl const * const D) {
-    // check is it reference or pointer type
-    {
-        clang::QualType const & T = D->getType();
-        if (! ((*T).isReferenceType() || (*T).isPointerType())) {
-            return 0;
-        }
+clang::DeclaratorDecl const * GetDeclarationFromExpr(clang::Expr const * const E) {
+    clang::ValueDecl const * RefVal = 0;
+
+    if (clang::DeclRefExpr const * const DRE = clang::dyn_cast<clang::DeclRefExpr const>(E)) {
+        RefVal = DRE->getDecl();
+    } else if (clang::MemberExpr const * const ME = clang::dyn_cast<clang::MemberExpr const>(E)) {
+        RefVal = ME->getMemberDecl();
     }
-    // check is it refer to a variable
-    if (clang::VarDecl const * const V = clang::dyn_cast<clang::VarDecl const>(D)) {
-        // get the initialization expression
-        if (clang::Expr const * const E = StripExpr(V->getInit())) {
-            clang::ValueDecl const * RefVal = 0;
 
-            if (clang::DeclRefExpr const * const RE = clang::dyn_cast<clang::DeclRefExpr const>(E)) {
-                RefVal = RE->getDecl();
-            } else if (clang::MemberExpr const * const ME = clang::dyn_cast<clang::MemberExpr const>(E)) {
-                RefVal = DigIntoMemberExpr(ME);
-            }
-
-            if (RefVal) {
-                return clang::dyn_cast<clang::DeclaratorDecl const>(RefVal);
-            }
-        }
+    if (RefVal) {
+        return clang::dyn_cast<clang::DeclaratorDecl const>(RefVal);
     }
     return 0;
 }
 
-
 } // namespace anonymous
+
 
 Variables GetVariablesFromContext(clang::DeclContext const * const F, bool const WithoutArgs) {
     Variables Result;
@@ -132,10 +143,35 @@ Methods GetMethodsFromRecord(clang::CXXRecordDecl const * const Rec) {
     return Result;
 }
 
-Variables GetReferedVariables(clang::DeclaratorDecl const * D) {
+Variables GetReferedVariables(clang::DeclaratorDecl const * const D) {
     Variables Result;
-    while ((D = ReferedTo(D))) {
-        Result.insert(D);
+
+    Variables Works;
+    Works.insert(D);
+
+    while (! Works.empty()) {
+        // get the current element
+        clang::DeclaratorDecl const * const Current = *(Works.begin());
+        Works.erase(Works.begin());
+        // current element goes into results
+        if (Current) {
+            Result.insert(Current);
+        } else {
+            continue;
+        }
+        // check is it reference or pointer type
+        {
+            clang::QualType const & T = Current->getType();
+            if (! ((*T).isReferenceType() || (*T).isPointerType())) {
+                continue;
+            }
+        }
+        // check is it refer to a variable
+        if (clang::VarDecl const * const V = clang::dyn_cast<clang::VarDecl const>(Current)) {
+            // get the initialization expression
+            std::set<clang::Expr const *> const & Es = CollectRefereeExpr(V->getInit());
+            boost::transform(Es, std::inserter(Works, Works.begin()), &GetDeclarationFromExpr);
+        }
     }
     return Result;
 }
@@ -148,7 +184,6 @@ Variables GetMemberVariablesAndReferences(clang::CXXRecordDecl const * const Rec
         for (Variables::const_iterator ReIt(Refs.begin()), ReEnd(Refs.end()); ReIt != ReEnd; ++ReIt) {
             if (Members.count(*ReIt)) {
                 Members.insert(Refs.begin(), Refs.end());
-                Members.insert(*LoIt);
                 break;
             }
         }

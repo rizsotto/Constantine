@@ -20,7 +20,6 @@
 #include <boost/range/adaptor/filtered.hpp>
 #include <boost/range/algorithm/copy.hpp>
 #include <boost/range/algorithm/for_each.hpp>
-#include <boost/range/algorithm/transform.hpp>
 #include <boost/range/algorithm/count_if.hpp>
 
 
@@ -104,7 +103,6 @@ public:
 
     void Eval(ScopeAnalysis const & Analysis, clang::DeclaratorDecl const * const V) {
         if (Analysis.WasChanged(V)) {
-            RegisterChange(V);
             boost::for_each(GetReferedVariables(V),
                 boost::bind(&PseudoConstnessAnalysisState::RegisterChange, this, _1));
         } else if (Changed.end() == Changed.find(V)) {
