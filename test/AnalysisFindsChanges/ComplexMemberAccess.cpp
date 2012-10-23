@@ -30,17 +30,17 @@ void member_access_test() {
     A & a = b.Inside;
 
     change_by_ref(b); // expected-note {{variable 'b' with type 'struct B' was changed}}
-    change_by_ref(b.Inside); // expected-note {{variable 'b' with type 'struct A' was changed}}
+    change_by_ref(b.Inside); // expected-note {{variable 'b' with type 'struct B' was changed}} // expected-note {{variable 'Inside' with type 'struct A' was changed}}
 
     change_by_ptr(&b); // expected-note {{variable 'b' with type 'struct B' was changed}}
-    change_by_ptr(&(b.Inside)); // expected-note {{variable 'b' with type 'struct A' was changed}}
+    change_by_ptr(&(b.Inside)); // expected-note {{variable 'b' with type 'struct B' was changed}} // expected-note {{variable 'Inside' with type 'struct A' was changed}}
 
     change_by_ref(a); // expected-note {{variable 'a' with type 'struct A' was changed}}
     change_by_ptr(&a); // expected-note {{variable 'a' with type 'struct A' was changed}}
 
     a.SetValue(0); // expected-note {{variable 'a' with type 'struct A' was changed}}
-    b.Inside.SetValue(0); // expected-note {{variable 'b' with type 'struct B' was changed}}
+    b.Inside.SetValue(0); // expected-note {{variable 'b' with type 'struct B' was changed}} // expected-note {{variable 'Inside' with type 'struct A' was changed}}
 
-    b.Inside.Value += 1; // expected-note {{variable 'b' with type 'struct B' was changed}}
-    a.Value += 1; // expected-note {{variable 'a' with type 'struct A' was changed}}
+    b.Inside.Value += 1; // expected-note {{variable 'b' with type 'struct B' was changed}} // expected-note {{variable 'Inside' with type 'struct A' was changed}} // expected-note {{variable 'Value' with type 'int' was changed}}
+    a.Value += 1; // expected-note {{variable 'a' with type 'struct A' was changed}} // expected-note {{variable 'Value' with type 'int' was changed}}
 }
