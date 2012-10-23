@@ -12,7 +12,8 @@ namespace {
 
 // Usage extract method implemented in visitor style.
 class UsageExtractor
-    : public clang::RecursiveASTVisitor<UsageExtractor> {
+    : public boost::noncopyable
+    , public clang::RecursiveASTVisitor<UsageExtractor> {
 public:
     typedef ScopeAnalysis::UsageRef UsageRef;
     typedef std::pair<clang::DeclaratorDecl const *, UsageRef> Usage;
@@ -31,7 +32,8 @@ public:
 
 private:
     UsageExtractor(Usage & In)
-        : clang::RecursiveASTVisitor<UsageExtractor>()
+        : boost::noncopyable()
+        , clang::RecursiveASTVisitor<UsageExtractor>()
         , Result(In)
     { }
 

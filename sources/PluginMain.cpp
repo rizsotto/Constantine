@@ -29,10 +29,13 @@ static char const * const plugin_name = "constantine";
 // The const analyser plugin... Implements the neccessary interface
 // to be a plugin. Parse command line arguments and dispatch the
 // real work to other classes.
-class Plugin : public clang::PluginASTAction {
+class Plugin
+    : public boost::noncopyable
+    , public clang::PluginASTAction {
 public:
     Plugin()
-        : clang::PluginASTAction()
+        : boost::noncopyable()
+        , clang::PluginASTAction()
         , Debug("debug-constantine",
             llvm::cl::desc("Set the debugging level for Medve plugin:"),
             llvm::cl::init(PseudoConstness),
