@@ -36,15 +36,7 @@ public:
     Plugin()
         : boost::noncopyable()
         , clang::PluginASTAction()
-        , Debug("debug-constantine",
-            llvm::cl::desc("Set the debugging level for Medve plugin:"),
-            llvm::cl::init(PseudoConstness),
-            llvm::cl::values(
-                clEnumVal(FuncionDeclaration, "Enable function detection"),
-                clEnumVal(VariableDeclaration, "Enable variables detection"),
-                clEnumVal(VariableChanges, "Enable variable change detection"),
-                clEnumVal(VariableUsages, "Enable variable usage detection"),
-                clEnumValEnd))
+        , Debug(PseudoConstness)
     { }
 
 private:
@@ -68,19 +60,32 @@ private:
         {
             // make llvm::cl::ParseCommandLineOptions happy
             ArgPtrs.push_back(plugin_name);
+
+            boost::transform(Args,
+                std::back_inserter(ArgPtrs),
+                boost::mem_fun_ref(&std::string::c_str));
         }
+        {
+            static llvm::cl::opt<Target> const
+                DebugParser("debug-constantine",
+                    llvm::cl::desc("Set the debugging level for Medve plugin:"),
+                    llvm::cl::init(PseudoConstness),
+                    llvm::cl::values(
+                        clEnumVal(FuncionDeclaration, "Enable function detection"),
+                        clEnumVal(VariableDeclaration, "Enable variables detection"),
+                        clEnumVal(VariableChanges, "Enable variable change detection"),
+                        clEnumVal(VariableUsages, "Enable variable usage detection"),
+                        clEnumValEnd));
 
-        boost::transform(Args,
-            std::back_inserter(ArgPtrs),
-            boost::mem_fun_ref(&std::string::c_str));
+            llvm::cl::ParseCommandLineOptions(ArgPtrs.size(), &ArgPtrs.front());
 
-        llvm::cl::ParseCommandLineOptions(ArgPtrs.size(), &ArgPtrs.front());
-
+            Debug = DebugParser;
+        }
         return true;
     }
 
 private:
-    llvm::cl::opt<Target> const Debug;
+    Target Debug;
 };
 
 } // namespace anonymous
