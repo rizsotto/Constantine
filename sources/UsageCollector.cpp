@@ -12,113 +12,79 @@ namespace {
 
 // Usage extract method implemented in visitor style.
 class UsageExtractor
-    : public clang::RecursiveASTVisitor<UsageExtractor> {
+    : public boost::noncopyable
+    , public clang::RecursiveASTVisitor<UsageExtractor> {
 public:
-    typedef ScopeAnalysis::UsageRef UsageRef;
-    typedef std::pair<clang::DeclaratorDecl const *, UsageRef> Usage;
-
-    static Usage GetUsage(clang::Expr const & Expr) {
-        Usage Result(0, UsageRef());
-        {
-            clang::Stmt const * const Stmt = &Expr;
-
-            UsageExtractor Visitor(Result);
-            Visitor.TraverseStmt(const_cast<clang::Stmt*>(Stmt));
-        }
-        Result.second.second = Expr.getSourceRange();
-        return Result;
-    }
-
-private:
-    UsageExtractor(Usage & In)
-        : clang::RecursiveASTVisitor<UsageExtractor>()
-        , Result(In)
+    UsageExtractor(ScopeAnalysis::UsageRefsMap & Out, clang::QualType const & InType)
+        : boost::noncopyable()
+        , clang::RecursiveASTVisitor<UsageExtractor>()
+        , Results(Out)
+        , WorkingType(InType)
     { }
 
+private:
     void SetType(clang::QualType const & In) {
         static clang::QualType const Empty = clang::QualType();
-        clang::QualType & Current = Result.second.first;
 
-        if (Empty != Current) {
+        if (Empty != WorkingType) {
             return;
         }
         if (Empty == In) {
             return;
         }
-        Current = In;
+        WorkingType = In;
     }
 
-    void SetVariable(clang::Decl const * const Decl) {
-        static clang::DeclaratorDecl const * const Empty = 0;
-        clang::DeclaratorDecl const * & Current = Result.first;
-
-        if (Empty != Current) {
-            return;
+    void AddToUsageMap(clang::ValueDecl const * const Decl,
+                       clang::QualType const & Type,
+                       clang::SourceRange const & Location) {
+        SetType(Type);
+        if (clang::DeclaratorDecl const * const D =
+                clang::dyn_cast<clang::DeclaratorDecl const>(Decl->getCanonicalDecl())) {
+            ScopeAnalysis::UsageRefsMap::iterator It = Results.find(D);
+            if (Results.end() == It) {
+                std::pair<ScopeAnalysis::UsageRefsMap::iterator, bool> const R =
+                    Results.insert(ScopeAnalysis::UsageRefsMap::value_type(D, ScopeAnalysis::UsageRefs()));
+                It = R.first;
+            }
+            ScopeAnalysis::UsageRefs & Ls = It->second;
+            Ls.push_back(ScopeAnalysis::UsageRef(WorkingType, Location));
         }
-        clang::DeclaratorDecl const * const In =
-            clang::dyn_cast<clang::DeclaratorDecl const>(Decl->getCanonicalDecl());
-        if (Empty == In) {
-            return;
-        }
-        Current = In;
+        WorkingType = clang::QualType();
     }
 
 public:
     // public visitor method.
-    bool VisitDeclRefExpr(clang::DeclRefExpr const * const Expr) {
-        SetVariable(Expr->getDecl());
-        SetType(Expr->getType());
+    bool VisitCastExpr(clang::CastExpr const * const E) {
+        SetType(E->getType());
         return true;
     }
 
-    bool VisitCastExpr(clang::CastExpr const * const Expr) {
-        SetType(Expr->getType());
-        return true;
-    }
-
-    bool VisitUnaryOperator(clang::UnaryOperator const * const Expr) {
-        switch (Expr->getOpcode()) {
+    bool VisitUnaryOperator(clang::UnaryOperator const * const E) {
+        switch (E->getOpcode()) {
         case clang::UO_AddrOf:
         case clang::UO_Deref:
-            SetType(Expr->getType());
+            SetType(E->getType());
         default:
             ;
         }
         return true;
     }
 
-    bool VisitMemberExpr(clang::MemberExpr const * Expr) {
-        if (IsCXXThisExpr::Check(Expr->getBase())) {
-            while (true) {
-                clang::Expr const * const Child = Expr->getBase();
-                if (clang::MemberExpr const * const Candidate = clang::dyn_cast<clang::MemberExpr const>(Child)) {
-                    Expr = Candidate;
-                    continue;
-                }
-                break;
-            }
-            SetVariable(Expr->getMemberDecl());
-            SetType(Expr->getType());
-        }
+    bool VisitDeclRefExpr(clang::DeclRefExpr const * const E) {
+        AddToUsageMap(E->getDecl(), E->getType(), E->getSourceRange());
+        return true;
+    }
+
+    bool VisitMemberExpr(clang::MemberExpr const * const E) {
+        AddToUsageMap(E->getMemberDecl(), E->getType(), E->getSourceRange());
         return true;
     }
 
 private:
-    Usage & Result;
+    ScopeAnalysis::UsageRefsMap & Results;
+    clang::QualType WorkingType;
 };
-
-void AddToUsageMap(ScopeAnalysis::UsageRefsMap & Results, UsageExtractor::Usage const & U) {
-    if (clang::DeclaratorDecl const * const VD = U.first) {
-        ScopeAnalysis::UsageRefsMap::iterator It = Results.find(VD);
-        if (Results.end() == It) {
-            std::pair<ScopeAnalysis::UsageRefsMap::iterator, bool> const R =
-                Results.insert(ScopeAnalysis::UsageRefsMap::value_type(VD, ScopeAnalysis::UsageRefs()));
-            It = R.first;
-        }
-        ScopeAnalysis::UsageRefs & Ls = It->second;
-        Ls.push_back(U.second);
-    }
-}
 
 // helper method not to be so verbose.
 struct IsItFromMainModule {
@@ -155,12 +121,11 @@ UsageCollector::UsageCollector(ScopeAnalysis::UsageRefsMap & Out)
 UsageCollector::~UsageCollector()
 { }
 
-void UsageCollector::AddToResults(clang::Expr const * const Stmt, clang::QualType const & Type) {
-    UsageExtractor::Usage U = UsageExtractor::GetUsage(*Stmt);
-    if (! Type.isNull()) {
-        U.second.first = Type;
-    }
-    return AddToUsageMap(Results, U);
+void UsageCollector::AddToResults(clang::Expr const * E, clang::QualType const & Type) {
+    clang::Stmt const * const Stmt = E;
+
+    UsageExtractor Visitor(Results, Type);
+    Visitor.TraverseStmt(const_cast<clang::Stmt*>(Stmt));
 }
 
 void UsageCollector::Report(char const * const M, clang::DiagnosticsEngine & DE) const {

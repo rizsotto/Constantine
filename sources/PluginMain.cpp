@@ -29,19 +29,14 @@ static char const * const plugin_name = "constantine";
 // The const analyser plugin... Implements the neccessary interface
 // to be a plugin. Parse command line arguments and dispatch the
 // real work to other classes.
-class Plugin : public clang::PluginASTAction {
+class Plugin
+    : public boost::noncopyable
+    , public clang::PluginASTAction {
 public:
     Plugin()
-        : clang::PluginASTAction()
-        , Debug("debug-constantine",
-            llvm::cl::desc("Set the debugging level for Medve plugin:"),
-            llvm::cl::init(PseudoConstness),
-            llvm::cl::values(
-                clEnumVal(FuncionDeclaration, "Enable function detection"),
-                clEnumVal(VariableDeclaration, "Enable variables detection"),
-                clEnumVal(VariableChanges, "Enable variable change detection"),
-                clEnumVal(VariableUsages, "Enable variable usage detection"),
-                clEnumValEnd))
+        : boost::noncopyable()
+        , clang::PluginASTAction()
+        , Debug(PseudoConstness)
     { }
 
 private:
@@ -65,19 +60,32 @@ private:
         {
             // make llvm::cl::ParseCommandLineOptions happy
             ArgPtrs.push_back(plugin_name);
+
+            boost::transform(Args,
+                std::back_inserter(ArgPtrs),
+                boost::mem_fun_ref(&std::string::c_str));
         }
+        {
+            static llvm::cl::opt<Target> const
+                DebugParser("debug-constantine",
+                    llvm::cl::desc("Set the debugging level for Medve plugin:"),
+                    llvm::cl::init(PseudoConstness),
+                    llvm::cl::values(
+                        clEnumVal(FuncionDeclaration, "Enable function detection"),
+                        clEnumVal(VariableDeclaration, "Enable variables detection"),
+                        clEnumVal(VariableChanges, "Enable variable change detection"),
+                        clEnumVal(VariableUsages, "Enable variable usage detection"),
+                        clEnumValEnd));
 
-        boost::transform(Args,
-            std::back_inserter(ArgPtrs),
-            boost::mem_fun_ref(&std::string::c_str));
+            llvm::cl::ParseCommandLineOptions(ArgPtrs.size(), &ArgPtrs.front());
 
-        llvm::cl::ParseCommandLineOptions(ArgPtrs.size(), &ArgPtrs.front());
-
+            Debug = DebugParser;
+        }
         return true;
     }
 
 private:
-    llvm::cl::opt<Target> const Debug;
+    Target Debug;
 };
 
 } // namespace anonymous

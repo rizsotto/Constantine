@@ -20,7 +20,7 @@ void member_access_test() {
 
     {
         int i = a.Value;
-        a.Value = 3; // expected-note {{variable 'a' with type 'struct A' was changed}}
+        a.Value = 3; // expected-note {{variable 'a' with type 'struct A' was changed}} // expected-note {{variable 'Value' with type 'int' was changed}}
     }
 
     {
