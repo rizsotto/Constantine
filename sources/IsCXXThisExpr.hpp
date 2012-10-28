@@ -1,4 +1,4 @@
-// Copyright 2012 by Laszlo Nagy [see file MIT-LICENSE]
+// This file is distributed under MIT-LICENSE. See COPYING for details.
 
 #ifndef _IsCXXThisExpr_hpp_
 #define _IsCXXThisExpr_hpp_

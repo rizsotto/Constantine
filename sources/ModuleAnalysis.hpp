@@ -1,4 +1,4 @@
-// Copyright 2012 by Laszlo Nagy [see file MIT-LICENSE]
+// This file is distributed under MIT-LICENSE. See COPYING for details.
 
 #ifndef _ModuleAnalysis_hpp_
 #define _ModuleAnalysis_hpp_
