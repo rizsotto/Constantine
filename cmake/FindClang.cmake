@@ -45,7 +45,7 @@ endfunction()
 
 
 find_program(LLVM_CONFIG
-    NAMES llvm-config llvm-config-3.2
+    NAMES llvm-config-3.2 llvm-config
     PATHS ENV LLVM_PATH)
 if(LLVM_CONFIG)
   message(STATUS "llvm-config found : ${LLVM_CONFIG}")
@@ -54,7 +54,7 @@ else()
 endif()
 
 find_program(LLVM_LIT
-    NAMES llvm-lit lit
+    NAMES lit llvm-lit
     PATHS ENV LLVM_PATH)
 if(LLVM_LIT)
   message(STATUS "llvm-lit found : ${LLVM_LIT}")
@@ -63,7 +63,7 @@ else()
 endif()
 
 find_program(CLANG_EXECUTABLE
-    NAMES clang clang-3.2
+    NAMES clang-3.2 clang
     PATHS ENV LLVM_PATH)
 if(CLANG_EXECUTABLE)
   message(STATUS "clang found : ${CLANG_EXECUTABLE}")
