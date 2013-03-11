@@ -7,8 +7,10 @@
 #   CLANG_EXECUTABLE
 
 function(set_clang_definitions config_cmd)
-  execute_process(COMMAND ${config_cmd} --cppflags OUTPUT_VARIABLE llvm_cppflags OUTPUT_STRIP_TRAILING_WHITESPACE)
-
+  execute_process(
+    COMMAND ${config_cmd} --cppflags
+    OUTPUT_VARIABLE llvm_cppflags
+    OUTPUT_STRIP_TRAILING_WHITESPACE)
   string(REGEX MATCHALL "(-D[^ ]*)" dflags ${llvm_cppflags})
   string(REGEX MATCHALL "(-U[^ ]*)" uflags ${llvm_cppflags})
   list(APPEND cxxflags ${dflags})
@@ -20,33 +22,48 @@ function(set_clang_definitions config_cmd)
 endfunction()
 
 function(is_clang_installed config_cmd)
-  execute_process(COMMAND ${LLVM_CONFIG} --includedir OUTPUT_VARIABLE include_dirs OUTPUT_STRIP_TRAILING_WHITESPACE)
-  execute_process(COMMAND ${LLVM_CONFIG} --src-root OUTPUT_VARIABLE llvm_src_dir OUTPUT_STRIP_TRAILING_WHITESPACE)
+  execute_process(
+    COMMAND ${config_cmd} --includedir
+    OUTPUT_VARIABLE include_dirs
+    OUTPUT_STRIP_TRAILING_WHITESPACE)
+  execute_process(
+    COMMAND ${config_cmd} --src-root
+    OUTPUT_VARIABLE llvm_src_dir
+    OUTPUT_STRIP_TRAILING_WHITESPACE)
   string(FIND ${include_dirs} ${llvm_src_dir} result)
 
   set(CLANG_INSTALLED ${result} PARENT_SCOPE)
 endfunction()
 
 function(set_clang_include_dirs config_cmd)
-  is_clang_installed(config_cmd)
+  is_clang_installed(${config_cmd})
   if(CLANG_INSTALLED)
-    execute_process(COMMAND ${LLVM_CONFIG} --includedir OUTPUT_VARIABLE include_dirs OUTPUT_STRIP_TRAILING_WHITESPACE)
+    execute_process(
+      COMMAND ${config_cmd} --includedir
+      OUTPUT_VARIABLE include_dirs
+      OUTPUT_STRIP_TRAILING_WHITESPACE)
   else()
-    execute_process(COMMAND ${LLVM_CONFIG} --src-root OUTPUT_VARIABLE llvm_src_dir OUTPUT_STRIP_TRAILING_WHITESPACE)
-    execute_process(COMMAND ${LLVM_CONFIG} --obj-root OUTPUT_VARIABLE llvm_obj_dir OUTPUT_STRIP_TRAILING_WHITESPACE)
-
+    execute_process(
+      COMMAND ${config_cmd} --src-root
+      OUTPUT_VARIABLE llvm_src_dir
+      OUTPUT_STRIP_TRAILING_WHITESPACE)
+    execute_process(
+      COMMAND ${config_cmd} --obj-root
+      OUTPUT_VARIABLE llvm_obj_dir
+      OUTPUT_STRIP_TRAILING_WHITESPACE)
     list(APPEND include_dirs "${llvm_src_dir}/include")
     list(APPEND include_dirs "${llvm_obj_dir}/include")
     list(APPEND include_dirs "${llvm_src_dir}/tools/clang/include")
     list(APPEND include_dirs "${llvm_obj_dir}/tools/clang/include")
   endif()
+
   set(CLANG_INCLUDE_DIRS ${include_dirs} PARENT_SCOPE)
 endfunction()
 
 
 find_program(LLVM_CONFIG
-    NAMES llvm-config-3.2 llvm-config
-    PATHS ENV LLVM_PATH)
+  NAMES llvm-config-3.2 llvm-config
+  PATHS ENV LLVM_PATH)
 if(LLVM_CONFIG)
   message(STATUS "llvm-config found : ${LLVM_CONFIG}")
 else()
@@ -54,8 +71,8 @@ else()
 endif()
 
 find_program(LLVM_LIT
-    NAMES lit llvm-lit
-    PATHS ENV LLVM_PATH)
+  NAMES lit llvm-lit
+  PATHS ENV LLVM_PATH)
 if(LLVM_LIT)
   message(STATUS "llvm-lit found : ${LLVM_LIT}")
 else()
@@ -63,8 +80,8 @@ else()
 endif()
 
 find_program(CLANG_EXECUTABLE
-    NAMES clang-3.2 clang
-    PATHS ENV LLVM_PATH)
+  NAMES clang-3.2 clang
+  PATHS ENV LLVM_PATH)
 if(CLANG_EXECUTABLE)
   message(STATUS "clang found : ${CLANG_EXECUTABLE}")
 else()
