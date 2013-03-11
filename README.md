@@ -26,6 +26,7 @@ You can pass `-DCMAKE_INSTALL_PREFIX=<path>` to override the default
 * To compile and run test suite: `make check`
 * To install: `make install` You can specify `DESTDIR` environment to prefix
 the `CMAKE_INSTALL_PREFIX`.
+* To create packages: `make package`.
 
 How to use
 ----------

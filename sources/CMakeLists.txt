@@ -1,31 +1,21 @@
 # This file is distributed under MIT-LICENSE. See COPYING for details.
 
-set(ourlib_target constantine)
+include(GNUInstallDirs)
 
-set(ourlib_sources
+include_directories(${CLANG_INCLUDE_DIRS})
+add_definitions(${CLANG_DEFINITIONS})
+
+add_library(constantine SHARED
     UsageCollector.cpp
     DeclarationCollector.cpp
     ScopeAnalysis.cpp
     PluginMain.cpp
     ModuleAnalysis.cpp
 )
-
-set(ourlib_symbols ${CMAKE_CURRENT_SOURCE_DIR}/ExportedSymbolsList)
-
-
-add_library(${ourlib_target} SHARED ${ourlib_sources})
-
-include_directories(${CLANG_INCLUDE_DIRS})
-add_definitions(${CLANG_DEFINITIONS})
-
-set_target_properties(${ourlib_target} PROPERTIES
-    LINKER_LANGUAGE CXX)
-set_target_properties(${ourlib_target} PROPERTIES
+set_target_properties(constantine PROPERTIES
+    LINKER_LANGUAGE CXX
+    LINK_FLAGS "-Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/ExportedSymbolsList"
     SOVERSION 1.0)
-set_target_properties(${ourlib_target} PROPERTIES
-    PREFIX "lib")
-set_target_properties(${ourlib_target} PROPERTIES
-    LINK_FLAGS "-Wl,--version-script=${ourlib_symbols}")
 
-install(TARGETS ${ourlib_target}
-    LIBRARY DESTINATION lib)
+install(TARGETS constantine
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
