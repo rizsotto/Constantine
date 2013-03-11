@@ -6,14 +6,15 @@
 #   CLANG_DEFINITIONS
 #   CLANG_EXECUTABLE
 
-function(set_clang_cxx_flags config_cmd)
+function(set_clang_definitions config_cmd)
   execute_process(COMMAND ${config_cmd} --cppflags OUTPUT_VARIABLE llvm_cppflags OUTPUT_STRIP_TRAILING_WHITESPACE)
 
-  string(REGEX MATCHALL "(-D[^ ]*)" cxxflags ${llvm_cppflags})
+  string(REGEX MATCHALL "(-D[^ ]*)" dflags ${llvm_cppflags})
+  string(REGEX MATCHALL "(-U[^ ]*)" uflags ${llvm_cppflags})
+  list(APPEND cxxflags ${dflags})
+  list(APPEND cxxflags ${uflags})
   list(APPEND cxxflags -fno-rtti)
   list(APPEND cxxflags -fno-exceptions)
-  list(APPEND cxxflags -fPIC)
-  list(APPEND cxxflags -pthread)
 
   set(CLANG_DEFINITIONS ${cxxflags} PARENT_SCOPE)
 endfunction()
@@ -43,7 +44,8 @@ function(set_clang_include_dirs config_cmd)
 endfunction()
 
 
-find_program(LLVM_CONFIG llvm-config
+find_program(LLVM_CONFIG
+    NAMES llvm-config llvm-config-3.2
     PATHS ENV LLVM_PATH)
 if(LLVM_CONFIG)
   message(STATUS "llvm-config found : ${LLVM_CONFIG}")
@@ -51,7 +53,8 @@ else()
   message(FATAL_ERROR "Can't found program: llvm-config")
 endif()
 
-find_program(LLVM_LIT llvm-lit
+find_program(LLVM_LIT
+    NAMES llvm-lit lit
     PATHS ENV LLVM_PATH)
 if(LLVM_LIT)
   message(STATUS "llvm-lit found : ${LLVM_LIT}")
@@ -59,7 +62,8 @@ else()
   message(FATAL_ERROR "Can't found program: llvm-lit")
 endif()
 
-find_program(CLANG_EXECUTABLE clang
+find_program(CLANG_EXECUTABLE
+    NAMES clang clang-3.2
     PATHS ENV LLVM_PATH)
 if(CLANG_EXECUTABLE)
   message(STATUS "clang found : ${CLANG_EXECUTABLE}")
@@ -67,7 +71,7 @@ else()
   message(FATAL_ERROR "Can't found program: clang")
 endif()
 
-set_clang_cxx_flags(${LLVM_CONFIG})
+set_clang_definitions(${LLVM_CONFIG})
 set_clang_include_dirs(${LLVM_CONFIG})
 
 message(STATUS "llvm-config filtered cpp flags : ${CLANG_DEFINITIONS}")
