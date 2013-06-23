@@ -43,7 +43,7 @@ private:
     // Decide wheater the compiler was invoked as C++ compiler or not.
     static bool IsCPlusPlus(clang::CompilerInstance const & Compiler) {
         clang::LangOptions const Opts = Compiler.getLangOpts();
-        return (Opts.CPlusPlus) || (Opts.CPlusPlus0x);
+        return Opts.CPlusPlus;
     }
 
     // ..:: Entry point for plugins ::..
