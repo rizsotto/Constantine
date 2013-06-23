@@ -70,15 +70,6 @@ else()
   message(FATAL_ERROR "Can't found program: llvm-config")
 endif()
 
-find_program(LLVM_LIT
-  NAMES lit llvm-lit
-  PATHS ENV LLVM_PATH)
-if(LLVM_LIT)
-  message(STATUS "llvm-lit found : ${LLVM_LIT}")
-else()
-  message(FATAL_ERROR "Can't found program: llvm-lit")
-endif()
-
 find_program(CLANG_EXECUTABLE
   NAMES clang-3.2 clang
   PATHS ENV LLVM_PATH)

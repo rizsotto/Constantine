@@ -1,12 +1,14 @@
 # This file is distributed under MIT-LICENSE. See COPYING for details.
+if (LIT_FOUND)
+  configure_file(
+    ${CMAKE_CURRENT_SOURCE_DIR}/lit.site.cfg.in
+    ${CMAKE_CURRENT_BINARY_DIR}/lit.site.cfg
+    @ONLY)
 
-configure_file(
-  ${CMAKE_CURRENT_SOURCE_DIR}/lit.site.cfg.in
-  ${CMAKE_CURRENT_BINARY_DIR}/lit.site.cfg
-  @ONLY)
-
-add_custom_target(check
-  COMMAND ${LLVM_LIT} -v .
-  COMMENT "Running regression tests")
-add_dependencies(check
-  constantine)
+  add_custom_target(check
+    COMMAND ${LIT_EXECUTABLE} -v .
+    COMMENT "Running regression tests")
+  add_dependencies(check constantine)
+else()
+  message(STATUS "Lit was not found, skip to run tests")
+endif()
