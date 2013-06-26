@@ -1,5 +1,3 @@
-# This file is distributed under MIT-LICENSE. See COPYING for details.
-
 include(GNUInstallDirs)
 
 include_directories(${CLANG_INCLUDE_DIRS})

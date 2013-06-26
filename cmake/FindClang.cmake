@@ -1,5 +1,3 @@
-# This file is distributed under MIT-LICENSE. See COPYING for details.
-
 # output:
 #   CLANG_FOUND
 #   CLANG_INCLUDE_DIRS
