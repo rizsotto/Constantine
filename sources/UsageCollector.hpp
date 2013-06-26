@@ -3,19 +3,22 @@
 #ifndef _UsageCollector_hpp_
 #define _UsageCollector_hpp_
 
-#include "ScopeAnalysis.hpp"
 
 #include <boost/noncopyable.hpp>
 #include <clang/AST/AST.h>
-#include <clang/AST/RecursiveASTVisitor.h>
 
 
 // Collect variable usages. One variable could have been used multiple
 // times with different constness of the given type.
 class UsageCollector
     : public boost::noncopyable {
+public:
+    typedef std::pair<clang::QualType, clang::SourceRange> UsageRef;
+    typedef std::list<UsageRef> UsageRefs;
+    typedef std::map<clang::DeclaratorDecl const *, UsageRefs> UsageRefsMap;
+
 protected:
-    UsageCollector(ScopeAnalysis::UsageRefsMap & Out);
+    UsageCollector(UsageRefsMap & Out);
     virtual ~UsageCollector();
 
     void AddToResults(
@@ -25,7 +28,7 @@ protected:
     void Report(char const * const Message, clang::DiagnosticsEngine &) const;
 
 private:
-    ScopeAnalysis::UsageRefsMap & Results;
+    UsageRefsMap & Results;
 };
 
 #endif // _UsageCollector_hpp_

@@ -3,6 +3,8 @@
 #ifndef _ScopeAnalysis_hpp_
 #define _ScopeAnalysis_hpp_
 
+#include "UsageCollector.hpp"
+
 #include <utility>
 #include <list>
 #include <map>
@@ -15,11 +17,6 @@
 // if they are never written to, implying that they constant.
 class ScopeAnalysis {
 public:
-    typedef std::pair<clang::QualType, clang::SourceRange> UsageRef;
-    typedef std::list<UsageRef> UsageRefs;
-    typedef std::map<clang::DeclaratorDecl const *, UsageRefs> UsageRefsMap;
-
-public:
     static ScopeAnalysis AnalyseThis(clang::Stmt const &);
 
     bool WasChanged(clang::DeclaratorDecl const *) const;
@@ -29,8 +26,8 @@ public:
     void DebugReferenced(clang::DiagnosticsEngine &) const;
 
 private:
-    UsageRefsMap Changed;
-    UsageRefsMap Used;
+    UsageCollector::UsageRefsMap Changed;
+    UsageCollector::UsageRefsMap Used;
 };
 
 #endif // _ScopeAnalysis_hpp_

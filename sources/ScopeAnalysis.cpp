@@ -1,7 +1,6 @@
 // This file is distributed under MIT-LICENSE. See COPYING for details.
 
 #include "ScopeAnalysis.hpp"
-#include "UsageCollector.hpp"
 #include "IsCXXThisExpr.hpp"
 
 #include <clang/AST/RecursiveASTVisitor.h>
@@ -14,7 +13,7 @@ class VariableChangeCollector
     : public UsageCollector
     , public clang::RecursiveASTVisitor<VariableChangeCollector> {
 public:
-    VariableChangeCollector(ScopeAnalysis::UsageRefsMap & Out)
+    VariableChangeCollector(UsageCollector::UsageRefsMap & Out)
         : UsageCollector(Out)
         , clang::RecursiveASTVisitor<VariableChangeCollector>()
     { }
@@ -136,7 +135,7 @@ class VariableAccessCollector
     : public UsageCollector
     , public clang::RecursiveASTVisitor<VariableAccessCollector> {
 public:
-    VariableAccessCollector(ScopeAnalysis::UsageRefsMap & Out)
+    VariableAccessCollector(UsageCollector::UsageRefsMap & Out)
         : UsageCollector(Out)
         , clang::RecursiveASTVisitor<VariableAccessCollector>()
     { }
@@ -156,7 +155,7 @@ public:
 
 public:
     void Report(clang::DiagnosticsEngine & DE) const {
-        UsageCollector::Report("symbol '%0' was used", DE);
+        UsageCollector::Report("symbol '%0' was used with type '%1'", DE);
     }
 };
 

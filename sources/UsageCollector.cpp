@@ -15,7 +15,7 @@ class UsageExtractor
     : public boost::noncopyable
     , public clang::RecursiveASTVisitor<UsageExtractor> {
 public:
-    UsageExtractor(ScopeAnalysis::UsageRefsMap & Out, clang::QualType const & InType)
+    UsageExtractor(UsageCollector::UsageRefsMap & Out, clang::QualType const & InType)
         : boost::noncopyable()
         , clang::RecursiveASTVisitor<UsageExtractor>()
         , Results(Out)
@@ -41,14 +41,14 @@ private:
         SetType(Type);
         if (clang::DeclaratorDecl const * const D =
                 clang::dyn_cast<clang::DeclaratorDecl const>(Decl->getCanonicalDecl())) {
-            ScopeAnalysis::UsageRefsMap::iterator It = Results.find(D);
+            UsageCollector::UsageRefsMap::iterator It = Results.find(D);
             if (Results.end() == It) {
-                std::pair<ScopeAnalysis::UsageRefsMap::iterator, bool> const R =
-                    Results.insert(ScopeAnalysis::UsageRefsMap::value_type(D, ScopeAnalysis::UsageRefs()));
+                std::pair<UsageCollector::UsageRefsMap::iterator, bool> const R =
+                    Results.insert(UsageCollector::UsageRefsMap::value_type(D, UsageCollector::UsageRefs()));
                 It = R.first;
             }
-            ScopeAnalysis::UsageRefs & Ls = It->second;
-            Ls.push_back(ScopeAnalysis::UsageRef(WorkingType, Location));
+            UsageCollector::UsageRefs & Ls = It->second;
+            Ls.push_back(UsageCollector::UsageRef(WorkingType, Location));
         }
         WorkingType = clang::QualType();
     }
@@ -82,7 +82,7 @@ public:
     }
 
 private:
-    ScopeAnalysis::UsageRefsMap & Results;
+    UsageCollector::UsageRefsMap & Results;
     clang::QualType WorkingType;
 };
 
@@ -92,17 +92,17 @@ struct IsItFromMainModule {
         clang::SourceManager const & SM = D->getASTContext().getSourceManager();
         return SM.isFromMainFile(D->getLocation());
     }
-    bool operator()(ScopeAnalysis::UsageRefsMap::value_type const & Var) const {
+    bool operator()(UsageCollector::UsageRefsMap::value_type const & Var) const {
         return this->operator()(Var.first);
     }
 };
 
-void DumpUsageMapEntry( ScopeAnalysis::UsageRefsMap::value_type const & Var
+void DumpUsageMapEntry( UsageCollector::UsageRefsMap::value_type const & Var
            , char const * const Message
            , clang::DiagnosticsEngine & DE) {
     unsigned const Id = DE.getCustomDiagID(clang::DiagnosticsEngine::Note, Message);
-    ScopeAnalysis::UsageRefs const & Ls = Var.second;
-    for (ScopeAnalysis::UsageRefs::const_iterator It(Ls.begin()), End(Ls.end()); It != End; ++It) {
+    UsageCollector::UsageRefs const & Ls = Var.second;
+    for (UsageCollector::UsageRefs::const_iterator It(Ls.begin()), End(Ls.end()); It != End; ++It) {
         clang::DiagnosticBuilder const DB = DE.Report(It->second.getBegin(), Id);
         DB << Var.first->getNameAsString();
         DB << It->first.getAsString();
@@ -113,7 +113,7 @@ void DumpUsageMapEntry( ScopeAnalysis::UsageRefsMap::value_type const & Var
 } // namespace anonymous
 
 
-UsageCollector::UsageCollector(ScopeAnalysis::UsageRefsMap & Out)
+UsageCollector::UsageCollector(UsageCollector::UsageRefsMap & Out)
     : boost::noncopyable()
     , Results(Out)
 { }
