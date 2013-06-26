@@ -1,7 +1,6 @@
 // This file is distributed under MIT-LICENSE. See COPYING for details.
 
-#ifndef _ModuleAnalysis_hpp_
-#define _ModuleAnalysis_hpp_
+#pragma once
 
 #include <clang/AST/ASTConsumer.h>
 #include <clang/Basic/Diagnostic.h>
@@ -28,5 +27,3 @@ private:
     clang::DiagnosticsEngine & Reporter;
     Target const State;
 };
-
-#endif // _ModuleAnalysis_hpp_

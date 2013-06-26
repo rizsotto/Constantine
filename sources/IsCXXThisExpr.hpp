@@ -1,7 +1,6 @@
 // This file is distributed under MIT-LICENSE. See COPYING for details.
 
-#ifndef _IsCXXThisExpr_hpp_
-#define _IsCXXThisExpr_hpp_
+#pragma once
 
 #include <boost/noncopyable.hpp>
 
@@ -35,5 +34,3 @@ private:
 
     bool Found;
 };
-
-#endif // _IsCXXThisExpr_hpp_

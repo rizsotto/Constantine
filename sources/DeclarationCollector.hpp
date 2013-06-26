@@ -1,7 +1,6 @@
 // This file is distributed under MIT-LICENSE. See COPYING for details.
 
-#ifndef _DeclarationCollector_hpp_
-#define _DeclarationCollector_hpp_
+#pragma once
 
 #include <set>
 
@@ -25,5 +24,3 @@ Variables GetReferedVariables(clang::DeclaratorDecl const *);
 
 // method to get all member variables and all refered declarations
 Variables GetMemberVariablesAndReferences(clang::CXXRecordDecl const * const Rec, clang::DeclContext const * const F);
-
-#endif // _DeclarationCollector_hpp_

@@ -1,7 +1,6 @@
 // This file is distributed under MIT-LICENSE. See COPYING for details.
 
-#ifndef _ScopeAnalysis_hpp_
-#define _ScopeAnalysis_hpp_
+#pragma once
 
 #include "UsageCollector.hpp"
 
@@ -29,5 +28,3 @@ private:
     UsageCollector::UsageRefsMap Changed;
     UsageCollector::UsageRefsMap Used;
 };
-
-#endif // _ScopeAnalysis_hpp_

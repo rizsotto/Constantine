@@ -1,8 +1,6 @@
 // This file is distributed under MIT-LICENSE. See COPYING for details.
 
-#ifndef _UsageCollector_hpp_
-#define _UsageCollector_hpp_
-
+#pragma once
 
 #include <boost/noncopyable.hpp>
 #include <clang/AST/AST.h>
@@ -30,5 +28,3 @@ protected:
 private:
     UsageRefsMap & Results;
 };
-
-#endif // _UsageCollector_hpp_
