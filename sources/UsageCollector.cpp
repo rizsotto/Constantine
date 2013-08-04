@@ -67,6 +67,7 @@ private:
             UsageCollector::UsageRefs & Ls = It->second;
             Ls.push_back(UsageCollector::UsageRef(WorkingType, Location));
         }
+        // reset the state for the next call
         WorkingType = clang::QualType();
     }
 

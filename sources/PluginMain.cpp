@@ -85,7 +85,7 @@ private:
         {
             static llvm::cl::opt<Target> const
                 DebugParser("debug-constantine",
-                    llvm::cl::desc("Set the debugging level for Medve plugin:"),
+                    llvm::cl::desc("Set the debugging level for Constantine plugin:"),
                     llvm::cl::init(PseudoConstness),
                     llvm::cl::values(
                         clEnumVal(FuncionDeclaration, "Enable function detection"),
