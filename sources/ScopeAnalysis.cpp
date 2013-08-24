@@ -54,15 +54,13 @@ public:
 
     // Arguments potentially mutated when you pass by-pointer or by-reference.
     bool VisitCXXConstructExpr(clang::CXXConstructExpr const * const Stmt) {
-        clang::CXXConstructorDecl const * const F = Stmt->getConstructor();
+        auto const F = Stmt->getConstructor();
         // check the function parameters one by one
-        unsigned int const Args =
-            std::min(Stmt->getNumArgs(), F->getNumParams());
-        for (unsigned int It = 0; It < Args; ++It) {
-            clang::ParmVarDecl const * const P = F->getParamDecl(It);
+        auto const Args = std::min(Stmt->getNumArgs(), F->getNumParams());
+        for (auto It = 0; It < Args; ++It) {
+            auto const P = F->getParamDecl(It);
             if (IsNonConstReferenced(P->getType())) {
-                AddToResults(Stmt->getArg(It),
-                             (*(P->getType())).getPointeeType());
+                AddToResults(Stmt->getArg(It), (*(P->getType())).getPointeeType());
             }
         }
         return true;
@@ -72,14 +70,13 @@ public:
     bool VisitCallExpr(clang::CallExpr const * const Stmt) {
         // some function call is a member call and has 'this' as a first
         // argument, which is not checked here.
-        unsigned int const Offset = HasThisAsFirstArgument(Stmt) ? 1 : 0;
+        auto const Offset = HasThisAsFirstArgument(Stmt) ? 1 : 0;
 
-        if (clang::FunctionDecl const * const F = Stmt->getDirectCallee()) {
+        if (auto const F = Stmt->getDirectCallee()) {
             // check the function parameters one by one
-            unsigned int const Args =
-                std::min(Stmt->getNumArgs(), F->getNumParams());
-            for (unsigned int It = 0; It < Args; ++It) {
-                clang::ParmVarDecl const * const P = F->getParamDecl(It);
+            auto const Args = std::min(Stmt->getNumArgs(), F->getNumParams());
+            for (auto It = 0; It < Args; ++It) {
+                auto const P = F->getParamDecl(It);
                 if (IsNonConstReferenced(P->getType())) {
                     assert(It + Offset <= Stmt->getNumArgs());
                     AddToResults(Stmt->getArg(It + Offset),
@@ -92,7 +89,7 @@ public:
 
     // Objects are mutated when non const member call happen.
     bool VisitCXXMemberCallExpr(clang::CXXMemberCallExpr const * const Stmt) {
-        if (clang::CXXMethodDecl const * const MD = Stmt->getMethodDecl()) {
+        if (auto const MD = Stmt->getMethodDecl()) {
             if ((! MD->isConst()) && (! MD->isStatic())) {
                 AddToResults(Stmt->getImplicitObjectArgument());
             }
@@ -104,12 +101,10 @@ public:
     bool VisitCXXOperatorCallExpr(clang::CXXOperatorCallExpr const * const Stmt) {
         // the implimentation relies on that here the first argument
         // is the 'this', while it was not the case with CXXMethodDecl.
-        if (clang::FunctionDecl const * const F = Stmt->getDirectCallee()) {
-            if (clang::CXXMethodDecl const * const MD = clang::dyn_cast<clang::CXXMethodDecl const>(F)) {
-                if ((! MD->isConst()) && (! MD->isStatic())) {
-                    if (0 < Stmt->getNumArgs()) {
-                        AddToResults(Stmt->getArg(0));
-                    }
+        if (auto const F = Stmt->getDirectCallee()) {
+            if (auto const MD = clang::dyn_cast<clang::CXXMethodDecl const>(F)) {
+                if ((! MD->isConst()) && (! MD->isStatic()) && (0 < Stmt->getNumArgs())) {
+                    AddToResults(Stmt->getArg(0));
                 }
             }
         }
@@ -118,8 +113,8 @@ public:
 
     // Placement new change change the pre allocated memory.
     bool VisitCXXNewExpr(clang::CXXNewExpr const * const Stmt) {
-        unsigned int const Args = Stmt->getNumPlacementArgs();
-        for (unsigned int It = 0; It < Args; ++It) {
+        auto const Args = Stmt->getNumPlacementArgs();
+        for (auto It = 0; It < Args; ++It) {
             // FIXME: not all placement argument are mutating.
             AddToResults(Stmt->getPlacementArg(It));
         }

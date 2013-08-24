@@ -28,7 +28,7 @@
 class UsageCollector
     : public boost::noncopyable {
 public:
-    typedef std::pair<clang::QualType, clang::SourceRange> UsageRef;
+    typedef std::tuple<clang::QualType, clang::SourceRange> UsageRef;
     typedef std::list<UsageRef> UsageRefs;
     typedef std::map<clang::DeclaratorDecl const *, UsageRefs> UsageRefsMap;
 

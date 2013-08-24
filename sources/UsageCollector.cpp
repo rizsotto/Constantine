@@ -18,9 +18,8 @@
  */
 
 #include "UsageCollector.hpp"
-#include "IsCXXThisExpr.hpp"
 
-#include <boost/bind.hpp>
+#include <functional>
 #include <boost/range.hpp>
 #include <boost/range/adaptor/filtered.hpp>
 #include <boost/range/algorithm/for_each.hpp>
@@ -56,12 +55,10 @@ private:
                        clang::QualType const & Type,
                        clang::SourceRange const & Location) {
         SetType(Type);
-        if (clang::DeclaratorDecl const * const D =
-                clang::dyn_cast<clang::DeclaratorDecl const>(Decl->getCanonicalDecl())) {
-            UsageCollector::UsageRefsMap::iterator It = Results.find(D);
+        if (auto const D = clang::dyn_cast<clang::DeclaratorDecl const>(Decl->getCanonicalDecl())) {
+            auto It = Results.find(D);
             if (Results.end() == It) {
-                std::pair<UsageCollector::UsageRefsMap::iterator, bool> const R =
-                    Results.insert(UsageCollector::UsageRefsMap::value_type(D, UsageCollector::UsageRefs()));
+                auto const R = Results.insert(UsageCollector::UsageRefsMap::value_type(D, UsageCollector::UsageRefs()));
                 It = R.first;
             }
             UsageCollector::UsageRefs & Ls = It->second;
@@ -107,7 +104,7 @@ private:
 // helper method not to be so verbose.
 struct IsItFromMainModule {
     bool operator()(clang::Decl const * const D) const {
-        clang::SourceManager const & SM = D->getASTContext().getSourceManager();
+        auto const & SM = D->getASTContext().getSourceManager();
         return SM.isFromMainFile(D->getLocation());
     }
     bool operator()(UsageCollector::UsageRefsMap::value_type const & Var) const {
@@ -118,12 +115,12 @@ struct IsItFromMainModule {
 void DumpUsageMapEntry( UsageCollector::UsageRefsMap::value_type const & Var
            , char const * const Message
            , clang::DiagnosticsEngine & DE) {
-    unsigned const Id = DE.getCustomDiagID(clang::DiagnosticsEngine::Note, Message);
-    UsageCollector::UsageRefs const & Ls = Var.second;
-    for (UsageCollector::UsageRefs::const_iterator It(Ls.begin()), End(Ls.end()); It != End; ++It) {
-        clang::DiagnosticBuilder const DB = DE.Report(It->second.getBegin(), Id);
+    auto const Id = DE.getCustomDiagID(clang::DiagnosticsEngine::Note, Message);
+    auto const & Ls = Var.second;
+    for (auto const &L : Ls) {
+        auto const DB = DE.Report(std::get<1>(L).getBegin(), Id);
         DB << Var.first->getNameAsString();
-        DB << It->first.getAsString();
+        DB << std::get<0>(L).getAsString();
         DB.setForceEmit();
     }
 }
@@ -148,5 +145,5 @@ void UsageCollector::AddToResults(clang::Expr const * E, clang::QualType const &
 
 void UsageCollector::Report(char const * const M, clang::DiagnosticsEngine & DE) const {
     boost::for_each(Results | boost::adaptors::filtered(IsItFromMainModule()),
-        boost::bind(DumpUsageMapEntry, _1, M, boost::ref(DE)));
+        std::bind(DumpUsageMapEntry, std::placeholders::_1, M, std::ref(DE)));
 }

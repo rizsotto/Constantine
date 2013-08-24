@@ -2,6 +2,7 @@ include(GNUInstallDirs)
 
 include_directories(${CLANG_INCLUDE_DIRS})
 add_definitions(${CLANG_DEFINITIONS})
+add_definitions(-std=c++11)
 
 add_library(constantine SHARED
     UsageCollector.cpp
