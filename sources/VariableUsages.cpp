@@ -45,16 +45,13 @@ private:
         WorkingType = Empty;
     }
 
-    void SetType(clang::QualType const & In) {
+    void SetType(clang::Expr const * const E) {
         static clang::QualType const Empty = clang::QualType();
 
         if (Empty != WorkingType) {
             return;
         }
-        if (Empty == In) {
-            return;
-        }
-        WorkingType = In;
+        WorkingType = E->getType();
     }
 
     void RegisterUsage(clang::ValueDecl const * const Decl,
@@ -75,7 +72,7 @@ private:
 public:
     // public visitor method.
     bool VisitCastExpr(clang::CastExpr const * const E) {
-        SetType(E->getType());
+        SetType(E);
         return true;
     }
 
@@ -83,7 +80,7 @@ public:
         switch (E->getOpcode()) {
         case clang::UO_AddrOf:
         case clang::UO_Deref:
-            SetType(E->getType());
+            SetType(E);
         default:
             ;
         }
@@ -91,13 +88,13 @@ public:
     }
 
     bool VisitDeclRefExpr(clang::DeclRefExpr const * const E) {
-        SetType(E->getType());
+        SetType(E);
         RegisterUsage(E->getDecl(), E->getSourceRange());
         return true;
     }
 
     bool VisitMemberExpr(clang::MemberExpr const * const E) {
-        SetType(E->getType());
+        SetType(E);
         RegisterUsage(E->getMemberDecl(), E->getSourceRange());
         return true;
     }
