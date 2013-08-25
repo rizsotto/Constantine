@@ -26,6 +26,9 @@
 
 namespace {
 
+static clang::QualType const NoType = clang::QualType();
+static clang::SourceRange const NoRange = clang::SourceRange();
+
 // Usage extract method implemented in visitor style.
 class UsageExtractor
     : public boost::noncopyable
@@ -35,27 +38,21 @@ public:
         : boost::noncopyable()
         , clang::RecursiveASTVisitor<UsageExtractor>()
         , Results(Out)
-        , WorkingType(InType)
+        , State(InType, NoRange)
     { }
 
 private:
-    void ResetType() {
-        static clang::QualType const Empty = clang::QualType();
-
-        WorkingType = Empty;
-    }
-
-    void SetType(clang::Expr const * const E) {
-        static clang::QualType const Empty = clang::QualType();
-
-        if (Empty != WorkingType) {
+    void Capture(clang::Expr const * const E) {
+        // do nothing if it already has type info
+        if (std::get<0>(State) != NoType)
             return;
-        }
-        WorkingType = E->getType();
+
+        State = std::make_tuple(E->getType(), E->getSourceRange());
     }
 
     void RegisterUsage(clang::ValueDecl const * const Decl,
                        clang::SourceRange const & Location) {
+        std::get<1>(State) = Location;
         if (auto const D = clang::dyn_cast<clang::DeclaratorDecl const>(Decl->getCanonicalDecl())) {
             auto It = Results.find(D);
             if (Results.end() == It) {
@@ -63,16 +60,16 @@ private:
                 It = R.first;
             }
             VariableUsages::UsageRefs & Ls = It->second;
-            Ls.push_back(VariableUsages::UsageRef(WorkingType, Location));
+            Ls.push_back(State);
         }
         // reset the state for the next call
-        ResetType();
+        State = std::make_tuple(NoType, NoRange);
     }
 
 public:
     // public visitor method.
     bool VisitCastExpr(clang::CastExpr const * const E) {
-        SetType(E);
+        Capture(E);
         return true;
     }
 
@@ -80,7 +77,7 @@ public:
         switch (E->getOpcode()) {
         case clang::UO_AddrOf:
         case clang::UO_Deref:
-            SetType(E);
+            Capture(E);
         default:
             ;
         }
@@ -88,20 +85,20 @@ public:
     }
 
     bool VisitDeclRefExpr(clang::DeclRefExpr const * const E) {
-        SetType(E);
+        Capture(E);
         RegisterUsage(E->getDecl(), E->getSourceRange());
         return true;
     }
 
     bool VisitMemberExpr(clang::MemberExpr const * const E) {
-        SetType(E);
+        Capture(E);
         RegisterUsage(E->getMemberDecl(), E->getSourceRange());
         return true;
     }
 
 private:
     VariableUsages::UsageRefsMap & Results;
-    clang::QualType WorkingType;
+    VariableUsages::UsageRef State;
 };
 
 // helper method not to be so verbose.
