@@ -36,7 +36,7 @@ protected:
     VariableUsages(UsageRefsMap & Out);
     virtual ~VariableUsages();
 
-    void AddToResults(
+    void Register(
             clang::Expr const * const Stmt,
             clang::QualType const & Type = clang::QualType());
 

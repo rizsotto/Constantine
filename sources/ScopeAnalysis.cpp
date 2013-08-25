@@ -39,7 +39,7 @@ public:
     // Assignments are mutating variables.
     bool VisitBinaryOperator(clang::BinaryOperator const * const Stmt) {
         if (Stmt->isAssignmentOp()) {
-            AddToResults(Stmt->getLHS());
+            Register(Stmt->getLHS());
         }
         return true;
     }
@@ -47,7 +47,7 @@ public:
     // Inc/Dec-rement operator does mutate variables.
     bool VisitUnaryOperator(clang::UnaryOperator const * const Stmt) {
         if (Stmt->isIncrementDecrementOp()) {
-            AddToResults(Stmt->getSubExpr());
+            Register(Stmt->getSubExpr());
         }
         return true;
     }
@@ -60,7 +60,7 @@ public:
         for (auto It = 0; It < Args; ++It) {
             auto const P = F->getParamDecl(It);
             if (IsNonConstReferenced(P->getType())) {
-                AddToResults(Stmt->getArg(It), (*(P->getType())).getPointeeType());
+                Register(Stmt->getArg(It), (*(P->getType())).getPointeeType());
             }
         }
         return true;
@@ -79,7 +79,7 @@ public:
                 auto const P = F->getParamDecl(It);
                 if (IsNonConstReferenced(P->getType())) {
                     assert(It + Offset <= Stmt->getNumArgs());
-                    AddToResults(Stmt->getArg(It + Offset),
+                    Register(Stmt->getArg(It + Offset),
                                  (*(P->getType())).getPointeeType());
                 }
             }
@@ -91,7 +91,7 @@ public:
     bool VisitCXXMemberCallExpr(clang::CXXMemberCallExpr const * const Stmt) {
         if (auto const MD = Stmt->getMethodDecl()) {
             if ((! MD->isConst()) && (! MD->isStatic())) {
-                AddToResults(Stmt->getImplicitObjectArgument());
+                Register(Stmt->getImplicitObjectArgument());
             }
         }
         return true;
@@ -104,7 +104,7 @@ public:
         if (auto const F = Stmt->getDirectCallee()) {
             if (auto const MD = clang::dyn_cast<clang::CXXMethodDecl const>(F)) {
                 if ((! MD->isConst()) && (! MD->isStatic()) && (0 < Stmt->getNumArgs())) {
-                    AddToResults(Stmt->getArg(0));
+                    Register(Stmt->getArg(0));
                 }
             }
         }
@@ -116,7 +116,7 @@ public:
         auto const Args = Stmt->getNumPlacementArgs();
         for (auto It = 0; It < Args; ++It) {
             // FIXME: not all placement argument are mutating.
-            AddToResults(Stmt->getPlacementArg(It));
+            Register(Stmt->getPlacementArg(It));
         }
         return true;
     }
@@ -154,13 +154,13 @@ public:
 
 public:
     bool VisitDeclRefExpr(clang::DeclRefExpr const * const Stmt) {
-        AddToResults(Stmt);
+        Register(Stmt);
         return true;
     }
 
     bool VisitMemberExpr(clang::MemberExpr * const Stmt) {
         if (IsCXXThisExpr::Check(Stmt)) {
-            AddToResults(Stmt);
+            Register(Stmt);
         }
         return true;
     }

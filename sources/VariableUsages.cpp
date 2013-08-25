@@ -142,7 +142,7 @@ VariableUsages::VariableUsages(VariableUsages::UsageRefsMap & Out)
 VariableUsages::~VariableUsages()
 { }
 
-void VariableUsages::AddToResults(clang::Expr const * E, clang::QualType const & Type) {
+void VariableUsages::Register(clang::Expr const * E, clang::QualType const & Type) {
     clang::Stmt const * const Stmt = E;
 
     UsageExtractor Visitor(Results, Type);
