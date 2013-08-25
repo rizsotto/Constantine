@@ -57,10 +57,8 @@ private:
         WorkingType = In;
     }
 
-    void AddToUsageMap(clang::ValueDecl const * const Decl,
-                       clang::QualType const & Type,
+    void RegisterUsage(clang::ValueDecl const * const Decl,
                        clang::SourceRange const & Location) {
-        SetType(Type);
         if (auto const D = clang::dyn_cast<clang::DeclaratorDecl const>(Decl->getCanonicalDecl())) {
             auto It = Results.find(D);
             if (Results.end() == It) {
@@ -93,12 +91,14 @@ public:
     }
 
     bool VisitDeclRefExpr(clang::DeclRefExpr const * const E) {
-        AddToUsageMap(E->getDecl(), E->getType(), E->getSourceRange());
+        SetType(E->getType());
+        RegisterUsage(E->getDecl(), E->getSourceRange());
         return true;
     }
 
     bool VisitMemberExpr(clang::MemberExpr const * const E) {
-        AddToUsageMap(E->getMemberDecl(), E->getType(), E->getSourceRange());
+        SetType(E->getType());
+        RegisterUsage(E->getMemberDecl(), E->getSourceRange());
         return true;
     }
 
