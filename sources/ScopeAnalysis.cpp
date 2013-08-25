@@ -27,11 +27,11 @@ namespace {
 // Collect all variables which were mutated in the given scope.
 // (The scope is given by the TraverseStmt method.)
 class VariableChangeCollector
-    : public UsageCollector
+    : public VariableUsages
     , public clang::RecursiveASTVisitor<VariableChangeCollector> {
 public:
-    VariableChangeCollector(UsageCollector::UsageRefsMap & Out)
-        : UsageCollector(Out)
+    VariableChangeCollector(VariableUsages::UsageRefsMap & Out)
+        : VariableUsages(Out)
         , clang::RecursiveASTVisitor<VariableChangeCollector>()
     { }
 
@@ -137,18 +137,18 @@ private:
 
 public:
     void Report(clang::DiagnosticsEngine & DE) const {
-        UsageCollector::Report("variable '%0' with type '%1' was changed", DE);
+        VariableUsages::Report("variable '%0' with type '%1' was changed", DE);
     }
 };
 
 // Collect all variables which were accessed in the given scope.
 // (The scope is given by the TraverseStmt method.)
 class VariableAccessCollector
-    : public UsageCollector
+    : public VariableUsages
     , public clang::RecursiveASTVisitor<VariableAccessCollector> {
 public:
-    VariableAccessCollector(UsageCollector::UsageRefsMap & Out)
-        : UsageCollector(Out)
+    VariableAccessCollector(VariableUsages::UsageRefsMap & Out)
+        : VariableUsages(Out)
         , clang::RecursiveASTVisitor<VariableAccessCollector>()
     { }
 
@@ -167,7 +167,7 @@ public:
 
 public:
     void Report(clang::DiagnosticsEngine & DE) const {
-        UsageCollector::Report("symbol '%0' was used with type '%1'", DE);
+        VariableUsages::Report("symbol '%0' was used with type '%1'", DE);
     }
 };
 

@@ -5,7 +5,7 @@ add_definitions(${CLANG_DEFINITIONS})
 add_definitions(-std=c++11)
 
 add_library(constantine SHARED
-    UsageCollector.cpp
+    VariableUsages.cpp
     DeclarationCollector.cpp
     ScopeAnalysis.cpp
     PluginMain.cpp

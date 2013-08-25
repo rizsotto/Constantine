@@ -19,7 +19,7 @@
 
 #pragma once
 
-#include "UsageCollector.hpp"
+#include "VariableUsages.hpp"
 
 #include <utility>
 #include <list>
@@ -42,6 +42,6 @@ public:
     void DebugReferenced(clang::DiagnosticsEngine &) const;
 
 private:
-    UsageCollector::UsageRefsMap Changed;
-    UsageCollector::UsageRefsMap Used;
+    VariableUsages::UsageRefsMap Changed;
+    VariableUsages::UsageRefsMap Used;
 };

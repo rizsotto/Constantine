@@ -25,7 +25,7 @@
 
 // Collect variable usages. One variable could have been used multiple
 // times with different constness of the given type.
-class UsageCollector
+class VariableUsages
     : public boost::noncopyable {
 public:
     typedef std::tuple<clang::QualType, clang::SourceRange> UsageRef;
@@ -33,8 +33,8 @@ public:
     typedef std::map<clang::DeclaratorDecl const *, UsageRefs> UsageRefsMap;
 
 protected:
-    UsageCollector(UsageRefsMap & Out);
-    virtual ~UsageCollector();
+    VariableUsages(UsageRefsMap & Out);
+    virtual ~VariableUsages();
 
     void AddToResults(
             clang::Expr const * const Stmt,

@@ -17,7 +17,7 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "UsageCollector.hpp"
+#include "VariableUsages.hpp"
 
 #include <functional>
 #include <boost/range.hpp>
@@ -31,7 +31,7 @@ class UsageExtractor
     : public boost::noncopyable
     , public clang::RecursiveASTVisitor<UsageExtractor> {
 public:
-    UsageExtractor(UsageCollector::UsageRefsMap & Out, clang::QualType const & InType)
+    UsageExtractor(VariableUsages::UsageRefsMap & Out, clang::QualType const & InType)
         : boost::noncopyable()
         , clang::RecursiveASTVisitor<UsageExtractor>()
         , Results(Out)
@@ -58,11 +58,11 @@ private:
         if (auto const D = clang::dyn_cast<clang::DeclaratorDecl const>(Decl->getCanonicalDecl())) {
             auto It = Results.find(D);
             if (Results.end() == It) {
-                auto const R = Results.insert(UsageCollector::UsageRefsMap::value_type(D, UsageCollector::UsageRefs()));
+                auto const R = Results.insert(VariableUsages::UsageRefsMap::value_type(D, VariableUsages::UsageRefs()));
                 It = R.first;
             }
-            UsageCollector::UsageRefs & Ls = It->second;
-            Ls.push_back(UsageCollector::UsageRef(WorkingType, Location));
+            VariableUsages::UsageRefs & Ls = It->second;
+            Ls.push_back(VariableUsages::UsageRef(WorkingType, Location));
         }
         // reset the state for the next call
         WorkingType = clang::QualType();
@@ -97,7 +97,7 @@ public:
     }
 
 private:
-    UsageCollector::UsageRefsMap & Results;
+    VariableUsages::UsageRefsMap & Results;
     clang::QualType WorkingType;
 };
 
@@ -107,12 +107,12 @@ struct IsItFromMainModule {
         auto const & SM = D->getASTContext().getSourceManager();
         return SM.isFromMainFile(D->getLocation());
     }
-    bool operator()(UsageCollector::UsageRefsMap::value_type const & Var) const {
+    bool operator()(VariableUsages::UsageRefsMap::value_type const & Var) const {
         return this->operator()(Var.first);
     }
 };
 
-void DumpUsageMapEntry( UsageCollector::UsageRefsMap::value_type const & Var
+void DumpUsageMapEntry( VariableUsages::UsageRefsMap::value_type const & Var
            , char const * const Message
            , clang::DiagnosticsEngine & DE) {
     auto const Id = DE.getCustomDiagID(clang::DiagnosticsEngine::Note, Message);
@@ -128,22 +128,22 @@ void DumpUsageMapEntry( UsageCollector::UsageRefsMap::value_type const & Var
 } // namespace anonymous
 
 
-UsageCollector::UsageCollector(UsageCollector::UsageRefsMap & Out)
+VariableUsages::VariableUsages(VariableUsages::UsageRefsMap & Out)
     : boost::noncopyable()
     , Results(Out)
 { }
 
-UsageCollector::~UsageCollector()
+VariableUsages::~VariableUsages()
 { }
 
-void UsageCollector::AddToResults(clang::Expr const * E, clang::QualType const & Type) {
+void VariableUsages::AddToResults(clang::Expr const * E, clang::QualType const & Type) {
     clang::Stmt const * const Stmt = E;
 
     UsageExtractor Visitor(Results, Type);
     Visitor.TraverseStmt(const_cast<clang::Stmt*>(Stmt));
 }
 
-void UsageCollector::Report(char const * const M, clang::DiagnosticsEngine & DE) const {
+void VariableUsages::Report(char const * const M, clang::DiagnosticsEngine & DE) const {
     boost::for_each(Results | boost::adaptors::filtered(IsItFromMainModule()),
         std::bind(DumpUsageMapEntry, std::placeholders::_1, M, std::ref(DE)));
 }
