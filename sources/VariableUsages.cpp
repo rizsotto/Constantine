@@ -39,6 +39,12 @@ public:
     { }
 
 private:
+    void ResetType() {
+        static clang::QualType const Empty = clang::QualType();
+
+        WorkingType = Empty;
+    }
+
     void SetType(clang::QualType const & In) {
         static clang::QualType const Empty = clang::QualType();
 
@@ -65,7 +71,7 @@ private:
             Ls.push_back(VariableUsages::UsageRef(WorkingType, Location));
         }
         // reset the state for the next call
-        WorkingType = clang::QualType();
+        ResetType();
     }
 
 public:
