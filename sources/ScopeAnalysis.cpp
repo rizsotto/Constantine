@@ -22,24 +22,51 @@
 
 #include <clang/AST/RecursiveASTVisitor.h>
 
+#include <boost/range.hpp>
+#include <boost/range/adaptor/filtered.hpp>
+#include <boost/range/algorithm/for_each.hpp>
+
 namespace {
+
+// helper method not to be so verbose.
+struct IsItFromMainModule {
+    bool operator()(clang::Decl const * const D) const {
+        auto const & SM = D->getASTContext().getSourceManager();
+        return SM.isFromMainFile(D->getLocation());
+    }
+    bool operator()(UsageRefsMap::value_type const & Var) const {
+        return this->operator()(Var.first);
+    }
+};
+
+void DumpUsageMapEntry( UsageRefsMap::value_type const & Var
+           , char const * const Message
+           , clang::DiagnosticsEngine & DE) {
+    auto const Id = DE.getCustomDiagID(clang::DiagnosticsEngine::Note, Message);
+    auto const & Ls = Var.second;
+    for (auto const &L : Ls) {
+        auto const DB = DE.Report(std::get<1>(L).getBegin(), Id);
+        DB << Var.first->getNameAsString();
+        DB << std::get<0>(L).getAsString();
+        DB.setForceEmit();
+    }
+}
 
 // Collect all variables which were mutated in the given scope.
 // (The scope is given by the TraverseStmt method.)
 class VariableChangeCollector
-    : public VariableUsages
-    , public clang::RecursiveASTVisitor<VariableChangeCollector> {
+    : public clang::RecursiveASTVisitor<VariableChangeCollector> {
 public:
-    VariableChangeCollector(VariableUsages::UsageRefsMap & Out)
-        : VariableUsages(Out)
-        , clang::RecursiveASTVisitor<VariableChangeCollector>()
+    VariableChangeCollector(UsageRefsMap & Out)
+        : clang::RecursiveASTVisitor<VariableChangeCollector>()
+        , Results(Out)
     { }
 
 public:
     // Assignments are mutating variables.
     bool VisitBinaryOperator(clang::BinaryOperator const * const Stmt) {
         if (Stmt->isAssignmentOp()) {
-            Register(Stmt->getLHS());
+            Register(Results, Stmt->getLHS());
         }
         return true;
     }
@@ -47,7 +74,7 @@ public:
     // Inc/Dec-rement operator does mutate variables.
     bool VisitUnaryOperator(clang::UnaryOperator const * const Stmt) {
         if (Stmt->isIncrementDecrementOp()) {
-            Register(Stmt->getSubExpr());
+            Register(Results, Stmt->getSubExpr());
         }
         return true;
     }
@@ -60,7 +87,7 @@ public:
         for (auto It = 0; It < Args; ++It) {
             auto const P = F->getParamDecl(It);
             if (IsNonConstReferenced(P->getType())) {
-                Register(Stmt->getArg(It), (*(P->getType())).getPointeeType());
+                Register(Results, Stmt->getArg(It), (*(P->getType())).getPointeeType());
             }
         }
         return true;
@@ -79,7 +106,7 @@ public:
                 auto const P = F->getParamDecl(It);
                 if (IsNonConstReferenced(P->getType())) {
                     assert(It + Offset <= Stmt->getNumArgs());
-                    Register(Stmt->getArg(It + Offset),
+                    Register(Results, Stmt->getArg(It + Offset),
                                  (*(P->getType())).getPointeeType());
                 }
             }
@@ -91,7 +118,7 @@ public:
     bool VisitCXXMemberCallExpr(clang::CXXMemberCallExpr const * const Stmt) {
         if (auto const MD = Stmt->getMethodDecl()) {
             if ((! MD->isConst()) && (! MD->isStatic())) {
-                Register(Stmt->getImplicitObjectArgument());
+                Register(Results, Stmt->getImplicitObjectArgument());
             }
         }
         return true;
@@ -104,7 +131,7 @@ public:
         if (auto const F = Stmt->getDirectCallee()) {
             if (auto const MD = clang::dyn_cast<clang::CXXMethodDecl const>(F)) {
                 if ((! MD->isConst()) && (! MD->isStatic()) && (0 < Stmt->getNumArgs())) {
-                    Register(Stmt->getArg(0));
+                    Register(Results, Stmt->getArg(0));
                 }
             }
         }
@@ -116,7 +143,7 @@ public:
         auto const Args = Stmt->getNumPlacementArgs();
         for (auto It = 0; It < Args; ++It) {
             // FIXME: not all placement argument are mutating.
-            Register(Stmt->getPlacementArg(It));
+            Register(Results, Stmt->getPlacementArg(It));
         }
         return true;
     }
@@ -137,38 +164,47 @@ private:
 
 public:
     void Report(clang::DiagnosticsEngine & DE) const {
-        VariableUsages::Report("variable '%0' with type '%1' was changed", DE);
+        char const * const M = "variable '%0' with type '%1' was changed";
+        boost::for_each(Results | boost::adaptors::filtered(IsItFromMainModule()),
+            std::bind(DumpUsageMapEntry, std::placeholders::_1, M, std::ref(DE)));
     }
+
+private:
+    UsageRefsMap & Results;
 };
 
 // Collect all variables which were accessed in the given scope.
 // (The scope is given by the TraverseStmt method.)
 class VariableAccessCollector
-    : public VariableUsages
-    , public clang::RecursiveASTVisitor<VariableAccessCollector> {
+    : public clang::RecursiveASTVisitor<VariableAccessCollector> {
 public:
-    VariableAccessCollector(VariableUsages::UsageRefsMap & Out)
-        : VariableUsages(Out)
-        , clang::RecursiveASTVisitor<VariableAccessCollector>()
+    VariableAccessCollector(UsageRefsMap & Out)
+        : clang::RecursiveASTVisitor<VariableAccessCollector>()
+        , Results(Out)
     { }
 
 public:
     bool VisitDeclRefExpr(clang::DeclRefExpr const * const Stmt) {
-        Register(Stmt);
+        Register(Results, Stmt);
         return true;
     }
 
     bool VisitMemberExpr(clang::MemberExpr * const Stmt) {
         if (IsCXXThisExpr::Check(Stmt)) {
-            Register(Stmt);
+            Register(Results, Stmt);
         }
         return true;
     }
 
 public:
     void Report(clang::DiagnosticsEngine & DE) const {
-        VariableUsages::Report("symbol '%0' was used with type '%1'", DE);
+        char const * const M = "symbol '%0' was used with type '%1'";
+        boost::for_each(Results | boost::adaptors::filtered(IsItFromMainModule()),
+            std::bind(DumpUsageMapEntry, std::placeholders::_1, M, std::ref(DE)));
     }
+
+private:
+    UsageRefsMap & Results;
 };
 
 } // namespace anonymous

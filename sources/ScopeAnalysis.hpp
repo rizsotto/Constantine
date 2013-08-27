@@ -42,6 +42,6 @@ public:
     void DebugReferenced(clang::DiagnosticsEngine &) const;
 
 private:
-    VariableUsages::UsageRefsMap Changed;
-    VariableUsages::UsageRefsMap Used;
+    UsageRefsMap Changed;
+    UsageRefsMap Used;
 };

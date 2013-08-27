@@ -19,29 +19,21 @@
 
 #pragma once
 
-#include <boost/noncopyable.hpp>
 #include <clang/AST/AST.h>
+
+#include <tuple>
+#include <list>
+#include <map>
 
 
 // Collect variable usages. One variable could have been used multiple
 // times with different constness of the given type.
-class VariableUsages
-    : public boost::noncopyable {
-public:
-    typedef std::tuple<clang::QualType, clang::SourceRange> UsageRef;
-    typedef std::list<UsageRef> UsageRefs;
-    typedef std::map<clang::DeclaratorDecl const *, UsageRefs> UsageRefsMap;
 
-protected:
-    VariableUsages(UsageRefsMap & Out);
-    virtual ~VariableUsages();
+typedef std::tuple<clang::QualType, clang::SourceRange> UsageRef;
+typedef std::list<UsageRef> UsageRefs;
+typedef std::map<clang::DeclaratorDecl const *, UsageRefs> UsageRefsMap;
 
-    void Register(
-            clang::Expr const * const Stmt,
-            clang::QualType const & Type = clang::QualType());
-
-    void Report(char const * const Message, clang::DiagnosticsEngine &) const;
-
-private:
-    UsageRefsMap & Results;
-};
+void Register(
+        UsageRefsMap & Results,
+        clang::Expr const * const Stmt,
+        clang::QualType const & Type = clang::QualType());
