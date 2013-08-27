@@ -37,3 +37,18 @@ void Register(
         UsageRefsMap & Results,
         clang::Expr const * const Stmt,
         clang::QualType const & Type = clang::QualType());
+
+
+struct IsItFromMainModule {
+    bool operator()(clang::Decl const * const D) const {
+        auto const & SM = D->getASTContext().getSourceManager();
+        return SM.isFromMainFile(D->getLocation());
+    }
+    bool operator()(UsageRefsMap::value_type const & Var) const {
+        return this->operator()(Var.first);
+    }
+};
+
+void DumpUsageMapEntry(UsageRefsMap::value_type const & Var
+           , char const * const Message
+           , clang::DiagnosticsEngine & DE);

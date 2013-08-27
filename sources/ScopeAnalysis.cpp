@@ -28,30 +28,6 @@
 
 namespace {
 
-// helper method not to be so verbose.
-struct IsItFromMainModule {
-    bool operator()(clang::Decl const * const D) const {
-        auto const & SM = D->getASTContext().getSourceManager();
-        return SM.isFromMainFile(D->getLocation());
-    }
-    bool operator()(UsageRefsMap::value_type const & Var) const {
-        return this->operator()(Var.first);
-    }
-};
-
-void DumpUsageMapEntry( UsageRefsMap::value_type const & Var
-           , char const * const Message
-           , clang::DiagnosticsEngine & DE) {
-    auto const Id = DE.getCustomDiagID(clang::DiagnosticsEngine::Note, Message);
-    auto const & Ls = Var.second;
-    for (auto const &L : Ls) {
-        auto const DB = DE.Report(std::get<1>(L).getBegin(), Id);
-        DB << Var.first->getNameAsString();
-        DB << std::get<0>(L).getAsString();
-        DB.setForceEmit();
-    }
-}
-
 // Collect all variables which were mutated in the given scope.
 // (The scope is given by the TraverseStmt method.)
 class VariableChangeCollector

@@ -88,14 +88,6 @@ void ReportFunctionDeclaration(clang::DiagnosticsEngine & DE, clang::DeclaratorD
 }
 
 
-// helper method not to be so verbose.
-struct IsItFromMainModule {
-    bool operator()(clang::Decl const * const D) const {
-        clang::SourceManager const & SM = D->getASTContext().getSourceManager();
-        return SM.isFromMainFile(D->getLocation());
-    }
-};
-
 bool IsJustAMethod(clang::CXXMethodDecl const * const F) {
     return
         (F->isUserProvided())

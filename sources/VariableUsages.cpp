@@ -110,3 +110,16 @@ void Register(UsageRefsMap & Results,
     UsageExtractor Visitor(Results, Type);
     Visitor.TraverseStmt(const_cast<clang::Stmt*>(Stmt));
 }
+
+void DumpUsageMapEntry(UsageRefsMap::value_type const & Var
+           , char const * const Message
+           , clang::DiagnosticsEngine & DE) {
+    auto const Id = DE.getCustomDiagID(clang::DiagnosticsEngine::Note, Message);
+    auto const & Ls = Var.second;
+    for (auto const &L : Ls) {
+        auto const DB = DE.Report(std::get<1>(L).getBegin(), Id);
+        DB << Var.first->getNameAsString();
+        DB << std::get<0>(L).getAsString();
+        DB.setForceEmit();
+    }
+}
