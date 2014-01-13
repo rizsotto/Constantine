@@ -1,4 +1,4 @@
-/*  Copyright (C) 2012, 2013  László Nagy
+/*  Copyright (C) 2012-2014  László Nagy
     This file is part of Constantine.
 
     Constantine implements pseudo const analysis.
