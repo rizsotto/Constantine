@@ -42,7 +42,7 @@ void Register(
 struct IsItFromMainModule {
     bool operator()(clang::Decl const * const D) const {
         auto const & SM = D->getASTContext().getSourceManager();
-        return SM.isFromMainFile(D->getLocation());
+        return SM.isInMainFile(D->getLocation());
     }
     bool operator()(UsageRefsMap::value_type const & Var) const {
         return this->operator()(Var.first);

@@ -19,6 +19,8 @@
 
 #include "VariableUsages.hpp"
 
+#include <clang/AST/RecursiveASTVisitor.h>
+
 #include <functional>
 #include <boost/noncopyable.hpp>
 
