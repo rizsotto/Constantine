@@ -60,7 +60,7 @@ public:
         auto const F = Stmt->getConstructor();
         // check the function parameters one by one
         auto const Args = std::min(Stmt->getNumArgs(), F->getNumParams());
-        for (auto It = 0; It < Args; ++It) {
+        for (auto It = 0u; It < Args; ++It) {
             auto const P = F->getParamDecl(It);
             if (IsNonConstReferenced(P->getType())) {
                 Register(Results, Stmt->getArg(It), (*(P->getType())).getPointeeType());
@@ -78,7 +78,7 @@ public:
         if (auto const F = Stmt->getDirectCallee()) {
             // check the function parameters one by one
             auto const Args = std::min(Stmt->getNumArgs(), F->getNumParams());
-            for (auto It = 0; It < Args; ++It) {
+            for (auto It = 0u; It < Args; ++It) {
                 auto const P = F->getParamDecl(It);
                 if (IsNonConstReferenced(P->getType())) {
                     assert(It + Offset <= Stmt->getNumArgs());
@@ -117,7 +117,7 @@ public:
     // Placement new change change the pre allocated memory.
     bool VisitCXXNewExpr(clang::CXXNewExpr const * const Stmt) {
         auto const Args = Stmt->getNumPlacementArgs();
-        for (auto It = 0; It < Args; ++It) {
+        for (auto It = 0u; It < Args; ++It) {
             // FIXME: not all placement argument are mutating.
             Register(Results, Stmt->getPlacementArg(It));
         }
