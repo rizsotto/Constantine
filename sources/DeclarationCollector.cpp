@@ -129,11 +129,11 @@ clang::DeclaratorDecl const * GetDeclarationFromExpr(clang::Expr const * const E
 } // namespace anonymous
 
 
-Variables GetVariablesFromContext(clang::DeclContext const * const F, bool const WithoutArgs) {
+Variables GetVariablesFromContext(clang::DeclContext const * const F, bool const WithArgs) {
     Variables Result;
     for (auto It(F->decls_begin()), End(F->decls_end()); It != End; ++It ) {
         if (auto const D = clang::dyn_cast<clang::VarDecl const>(*It)) {
-            if (! (WithoutArgs && (clang::dyn_cast<clang::ParmVarDecl const>(D)))) {
+            if (WithArgs || (!clang::dyn_cast<clang::ParmVarDecl const>(D))) {
                 Result.insert(D);
             }
         }

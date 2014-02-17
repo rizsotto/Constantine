@@ -27,7 +27,7 @@ typedef std::set<clang::DeclaratorDecl const *> Variables;
 typedef std::set<clang::CXXMethodDecl const *> Methods;
 
 // method to copy variables out from declaration context
-Variables GetVariablesFromContext(clang::DeclContext const * const F, bool const WithoutArgs = false);
+Variables GetVariablesFromContext(clang::DeclContext const * const F, bool const WithArgs = true);
 
 // method to copy variables out from class declaration
 Variables GetVariablesFromRecord(clang::CXXRecordDecl const * const Rec);
