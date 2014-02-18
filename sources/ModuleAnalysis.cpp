@@ -210,7 +210,7 @@ private:
     }
 
     void OnCXXMethodDecl(clang::CXXMethodDecl const * const F) {
-        boost::copy(GetVariablesFromContext(F, (! IsJustAMethod(F))),
+        boost::copy(GetVariablesFromContext(F, IsJustAMethod(F)),
             std::insert_iterator<Variables>(Result, Result.begin()));
         boost::copy(GetVariablesFromRecord(F->getParent()->getCanonicalDecl()),
             std::insert_iterator<Variables>(Result, Result.begin()));
@@ -271,7 +271,7 @@ private:
         Variables const MemberVariables = GetMemberVariablesAndReferences(RecordDecl, F);
         // check variables first,
         ScopeAnalysis const & Analysis = ScopeAnalysis::AnalyseThis(*(F->getBody()));
-        boost::for_each(GetVariablesFromContext(F, (! IsJustAMethod(F))),
+        boost::for_each(GetVariablesFromContext(F, IsJustAMethod(F)),
             std::bind(&PseudoConstnessAnalysisState::Eval, &State, std::cref(Analysis), std::placeholders::_1));
         boost::for_each(MemberVariables,
             std::bind(&PseudoConstnessAnalysisState::Eval, &State, std::cref(Analysis), std::placeholders::_1));
