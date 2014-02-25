@@ -100,3 +100,16 @@ int Sub::h4() { // expected-warning {{function 'h4' could be declared as const}}
 int Sub::h5() { // expected-warning {{function 'h5' could be declared as static}}
     return sf1();
 }
+
+
+class ForwardDeclared;
+
+class ForwardDeclared {
+    void setValue(int const value);
+
+    int m_value;
+};
+
+void ForwardDeclared::setValue(int const value) {
+    m_value = value;
+}
