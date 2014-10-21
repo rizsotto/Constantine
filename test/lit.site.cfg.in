@@ -5,4 +5,4 @@ config.constantine_obj_root = "@CMAKE_BINARY_DIR@"
 
 config.clang_bin = "@CLANG_EXECUTABLE@"
 
-lit.load_config(config, "@CMAKE_CURRENT_SOURCE_DIR@/lit.cfg")
+lit_config.load_config(config, "@CMAKE_CURRENT_SOURCE_DIR@/lit.cfg")
