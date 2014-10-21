@@ -140,9 +140,12 @@ private:
 
 public:
     void Report(clang::DiagnosticsEngine & DE) const {
-        char const * const M = "variable '%0' with type '%1' was changed";
-        boost::for_each(Results | boost::adaptors::filtered(IsItFromMainModule()),
-            std::bind(DumpUsageMapEntry, std::placeholders::_1, M, std::ref(DE)));
+        IsItFromMainModule Filter;
+        for (auto const Result : Results) {
+            if (Filter(Result)) {
+                DumpUsageMapEntry(Result, "variable '%0' with type '%1' was changed", DE);
+            }
+        }
     }
 
 private:
@@ -174,9 +177,12 @@ public:
 
 public:
     void Report(clang::DiagnosticsEngine & DE) const {
-        char const * const M = "symbol '%0' was used with type '%1'";
-        boost::for_each(Results | boost::adaptors::filtered(IsItFromMainModule()),
-            std::bind(DumpUsageMapEntry, std::placeholders::_1, M, std::ref(DE)));
+        IsItFromMainModule Filter;
+        for (auto const Result : Results) {
+            if (Filter(Result)) {
+                DumpUsageMapEntry(Result, "symbol '%0' was used with type '%1'", DE);
+            }
+        }
     }
 
 private:
