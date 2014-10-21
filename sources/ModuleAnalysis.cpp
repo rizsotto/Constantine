@@ -43,48 +43,42 @@
 namespace {
 
 // Report function for pseudo constness analysis.
-void EmitWarningMessage(clang::DiagnosticsEngine & DE, char const * const M, clang::DeclaratorDecl const * const V) {
+template <unsigned N>
+void EmitWarningMessage(clang::DiagnosticsEngine & DE, char const (&Message)[N], clang::DeclaratorDecl const * const V) {
     unsigned const Id =
-        DE.getCustomDiagID(clang::DiagnosticsEngine::Warning, M);
+        DE.getCustomDiagID(clang::DiagnosticsEngine::Warning, Message);
     clang::DiagnosticBuilder const DB = DE.Report(V->getLocStart(), Id);
     DB << V->getNameAsString();
     DB.setForceEmit();
 }
 
 void ReportVariablePseudoConstness(clang::DiagnosticsEngine & DE, clang::DeclaratorDecl const * const V) {
-    static char const * const Message =
-        "variable '%0' could be declared as const";
-    EmitWarningMessage(DE, Message, V);
+    EmitWarningMessage(DE, "variable '%0' could be declared as const", V);
 }
 
 void ReportFunctionPseudoConstness(clang::DiagnosticsEngine & DE, clang::DeclaratorDecl const * const V) {
-    static char const * const Message =
-        "function '%0' could be declared as const";
-    EmitWarningMessage(DE, Message, V);
+    EmitWarningMessage(DE, "function '%0' could be declared as const", V);
 }
 
 void ReportFunctionPseudoStaticness(clang::DiagnosticsEngine & DE, clang::DeclaratorDecl const * const V) {
-    static char const * const Message =
-        "function '%0' could be declared as static";
-    EmitWarningMessage(DE, Message, V);
+    EmitWarningMessage(DE, "function '%0' could be declared as static", V);
 }
 
 // Report function for debug functionality.
-void EmitNoteMessage(clang::DiagnosticsEngine & DE, char const * const M, clang::DeclaratorDecl const * const V) {
-    unsigned const Id = DE.getCustomDiagID(clang::DiagnosticsEngine::Note, M);
+template <unsigned N>
+void EmitNoteMessage(clang::DiagnosticsEngine & DE, char const (&Message)[N], clang::DeclaratorDecl const * const V) {
+    unsigned const Id = DE.getCustomDiagID(clang::DiagnosticsEngine::Note, Message);
     clang::DiagnosticBuilder const DB = DE.Report(V->getLocStart(), Id);
     DB << V->getNameAsString();
     DB.setForceEmit();
 }
 
 void ReportVariableDeclaration(clang::DiagnosticsEngine & DE, clang::DeclaratorDecl const * const V) {
-    static char const * const Message = "variable '%0' declared here";
-    EmitNoteMessage(DE, Message, V);
+    EmitNoteMessage(DE, "variable '%0' declared here", V);
 }
 
 void ReportFunctionDeclaration(clang::DiagnosticsEngine & DE, clang::DeclaratorDecl const * const V) {
-    static char const * const Message = "function '%0' declared here";
-    EmitNoteMessage(DE, Message, V);
+    EmitNoteMessage(DE, "function '%0' declared here", V);
 }
 
 
