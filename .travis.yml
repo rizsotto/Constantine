@@ -8,7 +8,7 @@ before_install:
   - sudo apt-get update -qq
 
 install:
-  - sudo apt-get install --allow-unauthenticated -qq libboost-dev clang-3.4 libclang-3.4-dev python-pip
+  - sudo apt-get install --allow-unauthenticated -qq libboost-dev clang-3.5 libclang-3.5-dev python-pip
   - sudo pip install lit
 
 before_script:
@@ -16,7 +16,7 @@ before_script:
   - cd build
 
 script:
-  - cmake -DCMAKE_CXX_COMPILER=clang++-3.4 -DCPACK_GENERATOR="TGZ;DEB" ..
+  - cmake -DCMAKE_CXX_COMPILER=clang++-3.5 -DCPACK_GENERATOR="TGZ;DEB" ..
   - make all
   - make check
   - mkdir target_dir
