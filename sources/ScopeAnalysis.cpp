@@ -244,13 +244,6 @@ private:
             (clang::dyn_cast<clang::CXXMethodDecl const>(Stmt->getDirectCallee()));
     }
 
-public:
-    void Report(clang::DiagnosticsEngine & DE) const {
-        for (auto const Result : Results) {
-            DumpUsageMapEntry(Result, "variable '%0' with type '%1' was changed", DE);
-        }
-    }
-
 private:
     UsageRefsMap & Results;
 };
@@ -276,13 +269,6 @@ public:
             Register(Results, Stmt);
         }
         return true;
-    }
-
-public:
-    void Report(clang::DiagnosticsEngine & DE) const {
-        for (auto const Result : Results) {
-            DumpUsageMapEntry(Result, "symbol '%0' was used with type '%1'", DE);
-        }
     }
 
 private:
@@ -313,17 +299,13 @@ bool ScopeAnalysis::WasReferenced(clang::DeclaratorDecl const * const Decl) cons
 }
 
 void ScopeAnalysis::DebugChanged(clang::DiagnosticsEngine & DE) const {
-    ScopeAnalysis Copy = *this;
-    {
-        VariableChangeCollector const Visitor(Copy.Changed);
-        Visitor.Report(DE);
+    for (auto const Entry : Changed) {
+        DumpUsageMapEntry(Entry, "variable '%0' with type '%1' was changed", DE);
     }
 }
 
 void ScopeAnalysis::DebugReferenced(clang::DiagnosticsEngine & DE) const {
-    ScopeAnalysis Copy = *this;
-    {
-        VariableAccessCollector const Visitor(Copy.Used);
-        Visitor.Report(DE);
+    for (auto const Entry : Used) {
+        DumpUsageMapEntry(Entry, "symbol '%0' was used with type '%1'", DE);
     }
 }
