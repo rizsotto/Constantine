@@ -19,8 +19,6 @@
 
 #pragma once
 
-#include "VariableUsages.hpp"
-
 #include <utility>
 #include <list>
 #include <map>
@@ -28,6 +26,11 @@
 #include <clang/AST/AST.h>
 #include <clang/Basic/Diagnostic.h>
 
+
+// One variable could have been used multiple times with different type.
+typedef std::tuple<clang::QualType, clang::SourceRange> UsageRef;
+typedef std::list<UsageRef> UsageRefs;
+typedef std::map<clang::DeclaratorDecl const *, UsageRefs> UsageRefsMap;
 
 // This class tracks the usage of variables in a statement body to see
 // if they are never written to, implying that they constant.
