@@ -22,6 +22,7 @@
 #include "DeclarationCollector.hpp"
 #include "ScopeAnalysis.hpp"
 #include "IsCXXThisExpr.hpp"
+#include "IsItFromMainModule.hpp"
 
 #include <functional>
 #include <iterator>
