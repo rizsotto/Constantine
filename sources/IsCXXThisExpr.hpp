@@ -19,16 +19,13 @@
 
 #pragma once
 
-#include <boost/noncopyable.hpp>
-
 #include <clang/AST/AST.h>
 #include <clang/AST/RecursiveASTVisitor.h>
 
 // These are helper struct/method to figure out was it a member
 // method call or a call on a variable.
 class IsCXXThisExpr
-    : public boost::noncopyable
-    , public clang::RecursiveASTVisitor<IsCXXThisExpr> {
+    : public clang::RecursiveASTVisitor<IsCXXThisExpr> {
 public:
     static bool Check(clang::Stmt const * const Stmt) {
         IsCXXThisExpr V;
@@ -44,10 +41,13 @@ public:
 
 private:
     IsCXXThisExpr()
-        : boost::noncopyable()
-        , clang::RecursiveASTVisitor<IsCXXThisExpr>()
+        : clang::RecursiveASTVisitor<IsCXXThisExpr>()
         , Found(false)
     { }
 
+    IsCXXThisExpr(IsCXXThisExpr const &) = delete;
+    IsCXXThisExpr & operator=(IsCXXThisExpr const &) = delete;
+
+private:
     bool Found;
 };

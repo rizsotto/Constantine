@@ -47,14 +47,15 @@ static char const * const plugin_name = "constantine";
 // to be a plugin. Parse command line arguments and dispatch the
 // real work to other classes.
 class Plugin
-    : public boost::noncopyable
-    , public clang::PluginASTAction {
+    : public clang::PluginASTAction {
 public:
     Plugin()
-        : boost::noncopyable()
-        , clang::PluginASTAction()
+        : clang::PluginASTAction()
         , Debug(PseudoConstness)
     { }
+
+    Plugin(Plugin const &) = delete;
+    Plugin & operator=(Plugin const &) = delete;
 
 private:
     // Decide wheater the compiler was invoked as C++ compiler or not.
