@@ -24,9 +24,6 @@
 #include <clang/AST/RecursiveASTVisitor.h>
 
 #include <functional>
-#include <boost/range.hpp>
-#include <boost/range/adaptor/filtered.hpp>
-#include <boost/range/algorithm/for_each.hpp>
 #include <boost/noncopyable.hpp>
 
 
