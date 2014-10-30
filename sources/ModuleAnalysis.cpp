@@ -32,7 +32,6 @@
 #include <clang/AST/AST.h>
 #include <clang/AST/RecursiveASTVisitor.h>
 
-#include <boost/noncopyable.hpp>
 #include <boost/range.hpp>
 #include <boost/range/adaptor/map.hpp>
 #include <boost/range/adaptor/filtered.hpp>
@@ -97,13 +96,16 @@ bool IsJustAMethod(clang::CXXMethodDecl const * const F) {
 // Pseudo constness analysis detects what variable can be declare as const.
 // This analysis runs through multiple scopes. We need to store the state of
 // the ongoing analysis. Once the variable was changed can't be const.
-class PseudoConstnessAnalysisState : public boost::noncopyable {
+class PseudoConstnessAnalysisState {
 public:
     PseudoConstnessAnalysisState()
-        : boost::noncopyable()
-        , Candidates()
+        : Candidates()
         , Changed()
     { }
+
+    PseudoConstnessAnalysisState(PseudoConstnessAnalysisState const &) = delete;
+    PseudoConstnessAnalysisState & operator=(PseudoConstnessAnalysisState const &) = delete;
+
 
     void Eval(ScopeAnalysis const & Analysis, clang::DeclaratorDecl const * const V) {
         if (Analysis.WasChanged(V)) {
@@ -142,8 +144,7 @@ private:
 // not desired. In case of a CXXMethodDecl, it was calling the VisitFunctionDecl
 // and the VisitCXXMethodDecl as well. This dispatching is reworked in this class.
 class ModuleVisitor
-    : public boost::noncopyable
-    , public clang::RecursiveASTVisitor<ModuleVisitor> {
+    : public clang::RecursiveASTVisitor<ModuleVisitor> {
 public:
     typedef std::auto_ptr<ModuleVisitor> Ptr;
     static ModuleVisitor::Ptr CreateVisitor(Target);
@@ -354,8 +355,7 @@ ModuleVisitor::Ptr ModuleVisitor::CreateVisitor(Target const State) {
 
 
 ModuleAnalysis::ModuleAnalysis(clang::CompilerInstance const & Compiler, Target const T)
-    : boost::noncopyable()
-    , clang::ASTConsumer()
+    : clang::ASTConsumer()
     , Reporter(Compiler.getDiagnostics())
     , State(T)
 { }

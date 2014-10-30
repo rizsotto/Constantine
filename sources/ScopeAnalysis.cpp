@@ -24,7 +24,6 @@
 #include <clang/AST/RecursiveASTVisitor.h>
 
 #include <functional>
-#include <boost/noncopyable.hpp>
 
 
 namespace {
@@ -34,15 +33,16 @@ static clang::SourceRange const NoRange = clang::SourceRange();
 
 // Usage extract method implemented in visitor style.
 class UsageExtractor
-    : public boost::noncopyable
-    , public clang::RecursiveASTVisitor<UsageExtractor> {
+    : public clang::RecursiveASTVisitor<UsageExtractor> {
 public:
     UsageExtractor(UsageRefsMap & Out, clang::QualType const & InType)
-        : boost::noncopyable()
-        , clang::RecursiveASTVisitor<UsageExtractor>()
+        : clang::RecursiveASTVisitor<UsageExtractor>()
         , Results(Out)
         , State(InType, NoRange)
     { }
+
+    UsageExtractor(UsageExtractor const &) = delete;
+    UsageExtractor & operator=(UsageExtractor const &) = delete;
 
 private:
     void Capture(clang::Expr const * const E) {

@@ -44,6 +44,14 @@ public:
     void DebugChanged(clang::DiagnosticsEngine &) const;
     void DebugReferenced(clang::DiagnosticsEngine &) const;
 
+public:
+    ScopeAnalysis() = default;
+    ScopeAnalysis(ScopeAnalysis &&) = default;
+    ScopeAnalysis & operator=(ScopeAnalysis &&) = default;
+
+    ScopeAnalysis(ScopeAnalysis const &) = delete;
+    ScopeAnalysis & operator=(ScopeAnalysis const &) = delete;
+
 private:
     UsageRefsMap Changed;
     UsageRefsMap Used;
