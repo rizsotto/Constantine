@@ -22,6 +22,7 @@
 #include "IsItFromMainModule.hpp"
 
 #include <clang/AST/RecursiveASTVisitor.h>
+#include <clang/Basic/Diagnostic.h>
 
 #include <functional>
 

@@ -24,7 +24,6 @@
 #include <map>
 
 #include <clang/AST/AST.h>
-#include <clang/Basic/Diagnostic.h>
 
 
 // One variable could have been used multiple times with different type.
