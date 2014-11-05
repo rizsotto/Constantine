@@ -31,6 +31,7 @@
 
 #include <clang/AST/AST.h>
 #include <clang/AST/RecursiveASTVisitor.h>
+#include <clang/Basic/Diagnostic.h>
 
 #include <boost/range.hpp>
 #include <boost/range/adaptor/map.hpp>
@@ -146,7 +147,7 @@ private:
 class ModuleVisitor
     : public clang::RecursiveASTVisitor<ModuleVisitor> {
 public:
-    typedef std::auto_ptr<ModuleVisitor> Ptr;
+    typedef std::unique_ptr<ModuleVisitor> Ptr;
     static ModuleVisitor::Ptr CreateVisitor(Target);
 
     virtual ~ModuleVisitor()

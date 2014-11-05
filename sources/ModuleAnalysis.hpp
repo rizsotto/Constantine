@@ -20,7 +20,6 @@
 #pragma once
 
 #include <clang/AST/ASTConsumer.h>
-#include <clang/Basic/Diagnostic.h>
 #include <clang/Frontend/CompilerInstance.h>
 
 enum Target
