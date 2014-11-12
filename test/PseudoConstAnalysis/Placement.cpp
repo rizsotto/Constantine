@@ -1,8 +1,10 @@
-// RUN: %clang_cc1 %s -fsyntax-only -verify
+// RUN: %clang_verify %s
 // expected-no-diagnostics
 
-void * operator new (unsigned int, void * p) throw();
-void * operator new[] (unsigned int, void * p) throw();
+#include <cstdlib>
+
+void * operator new (size_t, void * p) throw();
+void * operator new[] (size_t, void * p) throw();
 void operator delete (void *, void *) throw();
 void operator delete[] (void *, void *) throw();
 

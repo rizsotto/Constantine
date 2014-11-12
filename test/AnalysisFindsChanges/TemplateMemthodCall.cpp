@@ -1,4 +1,4 @@
-// RUN: %clang_cc1 %change %s -fsyntax-only -verify
+// RUN: %clang_verify %change %s
 
 template<typename T>
 struct TestType {

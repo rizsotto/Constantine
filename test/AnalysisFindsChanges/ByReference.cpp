@@ -1,4 +1,4 @@
-// RUN: %clang_cc1 %change %s -fsyntax-only -verify
+// RUN: %clang_verify %change %s
 
 void unary_operators() {
     int i = 0;
