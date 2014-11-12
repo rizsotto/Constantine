@@ -1,4 +1,4 @@
-// RUN: %clang_cc1 %show_functions %s -fsyntax-only -verify
+// RUN: %clang_verify %show_functions %s
 
 class A {
 

@@ -1,4 +1,4 @@
-// RUN: %clang_cc1 %usage %s -fsyntax-only -verify
+// RUN: %clang_verify %usage %s
 
 void simple_type_usage() {
     int const k = 0;
