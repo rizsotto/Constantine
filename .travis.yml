@@ -19,7 +19,7 @@ before_script:
   - cd build
 
 script:
-  - cmake -DCMAKE_CXX_COMPILER=clang++-3.7 -DCPACK_GENERATOR="TGZ;DEB" ..
+  - cmake -DCMAKE_CXX_COMPILER=clang++-3.7 -DCPACK_GENERATOR="TGZ;DEB" -DLIT_MODULE="/usr/lib/llvm-3.7/build/utils/lit/lit.py" ..
   - make all
   - make check
   - mkdir target_dir
