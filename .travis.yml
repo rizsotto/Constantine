@@ -8,7 +8,6 @@ addons:
       - clang-3.7
       - libclang-3.7-dev
       - llvm-3.7-tools
-      - libboost-dev
       - python-pip
     sources:
       - llvm-toolchain-precise-3.7

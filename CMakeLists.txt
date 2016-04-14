@@ -23,7 +23,6 @@ install(FILES COPYING README.md
   DESTINATION ${CMAKE_INSTALL_DOCDIR})
 
 set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
-find_package(Boost REQUIRED)
 find_package(Clang REQUIRED)
 find_package(Lit)
 

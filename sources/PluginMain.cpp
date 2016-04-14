@@ -28,9 +28,6 @@
 #include <clang/Frontend/CompilerInstance.h>
 #include <clang/AST/ASTConsumer.h>
 
-#include <boost/functional.hpp>
-#include <boost/range/algorithm/transform.hpp>
-
 
 namespace {
 
@@ -79,10 +76,9 @@ private:
         {
             // make llvm::cl::ParseCommandLineOptions happy
             ArgPtrs.push_back(plugin_name);
-
-            boost::transform(Args,
-                std::back_inserter(ArgPtrs),
-                boost::mem_fun_ref(&std::string::c_str));
+            for (auto && Arg : Args) {
+                ArgPtrs.push_back(Arg.c_str());
+            }
         }
         {
             static llvm::cl::opt<Target> const

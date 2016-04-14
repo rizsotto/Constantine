@@ -19,7 +19,7 @@
 
 #include "ScopeAnalysis.hpp"
 #include "IsCXXThisExpr.hpp"
-#include "IsItFromMainModule.hpp"
+#include "IsFromMainModule.hpp"
 
 #include <clang/AST/RecursiveASTVisitor.h>
 #include <clang/Basic/Diagnostic.h>
@@ -118,7 +118,7 @@ template <unsigned N>
 void DumpUsageMapEntry(UsageRefsMap::value_type const & Var
            , char const (&Message)[N]
            , clang::DiagnosticsEngine & DE) {
-    if (!IsItFromMainModule()(Var.first))
+    if (!IsFromMainModule(Var.first))
         return;
 
     auto const Id = DE.getCustomDiagID(clang::DiagnosticsEngine::Note, Message);

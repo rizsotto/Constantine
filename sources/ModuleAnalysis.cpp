@@ -22,7 +22,7 @@
 #include "DeclarationCollector.hpp"
 #include "ScopeAnalysis.hpp"
 #include "IsCXXThisExpr.hpp"
-#include "IsItFromMainModule.hpp"
+#include "IsFromMainModule.hpp"
 
 #include <functional>
 #include <iterator>
@@ -32,13 +32,6 @@
 #include <clang/AST/AST.h>
 #include <clang/AST/RecursiveASTVisitor.h>
 #include <clang/Basic/Diagnostic.h>
-
-#include <boost/range.hpp>
-#include <boost/range/adaptor/map.hpp>
-#include <boost/range/adaptor/filtered.hpp>
-#include <boost/range/algorithm/copy.hpp>
-#include <boost/range/algorithm/for_each.hpp>
-#include <boost/range/algorithm/count_if.hpp>
 
 
 namespace {
@@ -110,8 +103,9 @@ public:
 
     void Eval(ScopeAnalysis const & Analysis, clang::DeclaratorDecl const * const V) {
         if (Analysis.WasChanged(V)) {
-            boost::for_each(GetReferedVariables(V),
-                std::bind(&PseudoConstnessAnalysisState::RegisterChange, this, std::placeholders::_1));
+            for (auto && Variable: GetReferedVariables(V)) {
+                RegisterChange(Variable);
+            }
         } else if (Changed.end() == Changed.find(V)) {
             if (! IsConst(*V)) {
                 Candidates.insert(V);
@@ -120,8 +114,11 @@ public:
     }
 
     void GenerateReports(clang::DiagnosticsEngine & DE) const {
-        boost::for_each(Candidates | boost::adaptors::filtered(IsItFromMainModule()),
-            std::bind(ReportVariablePseudoConstness, std::ref(DE), std::placeholders::_1));
+        for (auto && Variable: Candidates) {
+            if (IsFromMainModule(Variable)) {
+                ReportVariablePseudoConstness(DE, Variable);
+            }
+        }
     }
 
 private:
@@ -189,8 +186,9 @@ protected:
     }
 
     void Dump(clang::DiagnosticsEngine & DE) const {
-        boost::for_each(Functions,
-            std::bind(ReportFunctionDeclaration, std::ref(DE), std::placeholders::_1));
+        for (auto && Function: Functions) {
+            ReportFunctionDeclaration(DE, Function);
+        }
     }
 
 protected:
@@ -202,25 +200,30 @@ class DebugVariableDeclarations
     : public ModuleVisitor {
 private:
     void OnFunctionDecl(clang::FunctionDecl const * const F) {
-        boost::copy(GetVariablesFromContext(F),
-            std::insert_iterator<Variables>(Result, Result.begin()));
+        for (auto && Variable: GetVariablesFromContext(F)) {
+            Results.insert(Variable);
+        }
     }
 
     void OnCXXMethodDecl(clang::CXXMethodDecl const * const F) {
-        boost::copy(GetVariablesFromContext(F, (! IsJustAMethod(F))),
-            std::insert_iterator<Variables>(Result, Result.begin()));
+        for (auto && Variable: GetVariablesFromContext(F, (! IsJustAMethod(F)))) {
+            Results.insert(Variable);
+        }
         clang::CXXRecordDecl const * const Parent = F->getParent();
-        boost::copy(GetVariablesFromRecord(Parent->hasDefinition() ? Parent->getDefinition() : Parent->getCanonicalDecl()),
-            std::insert_iterator<Variables>(Result, Result.begin()));
+        auto const Declaration = Parent->hasDefinition() ? Parent->getDefinition() : Parent->getCanonicalDecl();
+        for (auto && Variable: GetVariablesFromRecord(Declaration)) {
+            Results.insert(Variable);
+        }
     }
 
     void Dump(clang::DiagnosticsEngine & DE) const {
-        boost::for_each(Result,
-            std::bind(ReportVariableDeclaration, std::ref(DE), std::placeholders::_1));
+        for (auto && Result: Results) {
+            ReportVariableDeclaration(DE, Result);
+        }
     }
 
 private:
-    Variables Result;
+    Variables Results;
 };
 
 
@@ -233,8 +236,9 @@ private:
     }
 
     void Dump(clang::DiagnosticsEngine & DE) const {
-        boost::for_each(Functions,
-            std::bind(ReportVariableUsage, std::ref(DE), std::placeholders::_1));
+        for (auto && Function: Functions) {
+            ReportVariableUsage(DE, Function);
+        }
     }
 };
 
@@ -248,8 +252,9 @@ private:
     }
 
     void Dump(clang::DiagnosticsEngine & DE) const {
-        boost::for_each(Functions,
-            std::bind(ReportVariableUsage, std::ref(DE), std::placeholders::_1));
+        for (auto && Function: Functions) {
+            ReportVariableUsage(DE, Function);
+        }
     }
 };
 
@@ -259,8 +264,9 @@ class AnalyseVariableUsage
 private:
     void OnFunctionDecl(clang::FunctionDecl const * const F) {
         ScopeAnalysis const & Analysis = ScopeAnalysis::AnalyseThis(*(F->getBody()));
-        boost::for_each(GetVariablesFromContext(F),
-            std::bind(&PseudoConstnessAnalysisState::Eval, &State, std::cref(Analysis), std::placeholders::_1));
+        for (auto && Variable: GetVariablesFromContext(F)) {
+            State.Eval(Analysis, Variable);
+        }
     }
 
     void OnCXXMethodDecl(clang::CXXMethodDecl const * const F) {
@@ -270,10 +276,12 @@ private:
         Variables const MemberVariables = GetMemberVariablesAndReferences(RecordDecl, F);
         // check variables first,
         ScopeAnalysis const & Analysis = ScopeAnalysis::AnalyseThis(*(F->getBody()));
-        boost::for_each(GetVariablesFromContext(F, (! IsJustAMethod(F))),
-            std::bind(&PseudoConstnessAnalysisState::Eval, &State, std::cref(Analysis), std::placeholders::_1));
-        boost::for_each(MemberVariables,
-            std::bind(&PseudoConstnessAnalysisState::Eval, &State, std::cref(Analysis), std::placeholders::_1));
+        for (auto && Variable: GetVariablesFromContext(F, (! IsJustAMethod(F)))) {
+            State.Eval(Analysis, Variable);
+        }
+        for (auto && Variable: MemberVariables) {
+            State.Eval(Analysis, Variable);
+        }
         // then check the method itself.
         if ((! F->isVirtual()) &&
             (! F->isStatic()) &&
@@ -281,54 +289,60 @@ private:
             IsJustAMethod(F)
         ) {
             Methods const MemberFunctions = GetMethodsFromRecord(RecordDecl);
-            // check the constness first..
-            unsigned int const MemberChanges =
-                boost::count_if(MemberVariables,
-                    std::bind(&ScopeAnalysis::WasChanged, &Analysis, std::placeholders::_1));
-            unsigned int const FunctionChanges =
-                boost::count_if(
-                    MemberFunctions | boost::adaptors::filtered(IsMutatingMethod()),
-                    std::bind(&ScopeAnalysis::WasReferenced, &Analysis, std::placeholders::_1));
-            // if it looks const, it might be even static..
-            if ((0 == MemberChanges) && (0 == FunctionChanges)) {
-                unsigned int const MemberAccess =
-                    boost::count_if(MemberVariables,
-                        std::bind(&ScopeAnalysis::WasReferenced, &Analysis, std::placeholders::_1));
-                unsigned int const FunctionAccess =
-                    boost::count_if(
-                        MemberFunctions | boost::adaptors::filtered(IsMemberMethod()),
-                        std::bind(&ScopeAnalysis::WasReferenced, &Analysis, std::placeholders::_1));
-                if ((0 == MemberAccess) && (0 == FunctionAccess) &&
-                    (! IsCXXThisExpr::Check(F->getBody()))
-                ) {
-                    StaticCandidates.insert(F);
-                } else if (! F->isConst()) {
-                    ConstCandidates.insert(F);
+            for (auto && Variable: MemberVariables) {
+                if (Analysis.WasChanged(Variable)) {
+                    return;
                 }
+            }
+            for (auto && Function: MemberFunctions) {
+                if (IsMutatingMethod(Function) && Analysis.WasReferenced(Function)) {
+                    return;
+                }
+            }
+            // if it looks const, it might be even static..
+            bool NotMutateMember = ! IsCXXThisExpr::Check(F->getBody());
+            for (auto && Variable: MemberVariables) {
+                if (Analysis.WasReferenced(Variable)) {
+                    NotMutateMember = false;
+                }
+            }
+            for (auto && Function : MemberFunctions) {
+                if (IsMemberMethod(Function) && Analysis.WasReferenced(Function)) {
+                    NotMutateMember = false;
+                }
+            }
+            if (NotMutateMember) {
+                StaticCandidates.insert(F);
+            } else if (! F->isConst()) {
+                ConstCandidates.insert(F);
             }
         }
     }
 
     void Dump(clang::DiagnosticsEngine & DE) const {
         State.GenerateReports(DE);
-        boost::for_each(ConstCandidates | boost::adaptors::filtered(IsItFromMainModule()),
-            std::bind(ReportFunctionPseudoConstness, std::ref(DE), std::placeholders::_1));
-        boost::for_each(StaticCandidates | boost::adaptors::filtered(IsItFromMainModule()),
-            std::bind(ReportFunctionPseudoStaticness, std::ref(DE), std::placeholders::_1));
+        for (auto && Candidate: ConstCandidates) {
+            if (IsFromMainModule(Candidate)) {
+                ReportFunctionPseudoConstness(DE, Candidate);
+            }
+        }
+        for (auto && Candidate: StaticCandidates) {
+            if (IsFromMainModule(Candidate)) {
+                ReportFunctionPseudoStaticness(DE, Candidate);
+            }
+        }
     }
 
 private:
-    struct IsMutatingMethod {
-        bool operator()(clang::CXXMethodDecl const * const F) const {
-            return (! F->isStatic()) && (! F->isConst());
-        }
-    };
+    inline
+    static bool IsMutatingMethod(clang::CXXMethodDecl const * const F) {
+        return (! F->isStatic()) && (! F->isConst());
+    }
 
-    struct IsMemberMethod {
-        bool operator()(clang::CXXMethodDecl const * const F) const {
-            return (! F->isStatic());
-        }
-    };
+    inline
+    static bool IsMemberMethod(clang::CXXMethodDecl const * const F) {
+        return (! F->isStatic());
+    }
 
 private:
     PseudoConstnessAnalysisState State;

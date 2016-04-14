@@ -30,9 +30,6 @@ For Unbuntu/Debian build, you can take a look at the `.travis.yml` file.
    not provide it, you can simply install from [PyPI][PyPI] because it is
    written in python.
 
-6. Install **Boost C++ Libraries**, version 1.46.1 or greater. Constantine
-   relies on header-only libraries.
-
    [LIT]: http://llvm.org/docs/CommandGuide/lit.html
    [PyPI]: https://pypi.python.org/pypi/lit
 

@@ -19,8 +19,6 @@
 
 #include "DeclarationCollector.hpp"
 
-#include <boost/range.hpp>
-#include <boost/range/algorithm/transform.hpp>
 
 namespace {
 
@@ -179,10 +177,11 @@ Variables GetReferedVariables(clang::DeclaratorDecl const * const D) {
             }
         }
         // check is it refer to a variable
-        if (auto const V = clang::dyn_cast<clang::VarDecl const>(Current)) {
+        if (auto const Variable = clang::dyn_cast<clang::VarDecl const>(Current)) {
             // get the initialization expression
-            auto const & Es = CollectRefereeExpr(V->getInit());
-            boost::transform(Es, std::inserter(Works, Works.begin()), &GetDeclarationFromExpr);
+            for (auto && Expression: CollectRefereeExpr(Variable->getInit())) {
+                Works.insert(GetDeclarationFromExpr(Expression));
+            }
         }
     }
     return Result;

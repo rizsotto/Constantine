@@ -21,9 +21,9 @@
 
 #include <clang/AST/AST.h>
 
-struct IsItFromMainModule {
-    bool operator()(clang::Decl const * const D) const {
-        auto const & SM = D->getASTContext().getSourceManager();
-        return SM.isInMainFile(D->getLocation());
-    }
-};
+
+inline
+bool IsFromMainModule(clang::Decl const * const D) {
+    auto const & SM = D->getASTContext().getSourceManager();
+    return SM.isInMainFile(D->getLocation());
+}
