@@ -35,7 +35,7 @@ class ModuleAnalysis : public clang::ASTConsumer {
 public:
     ModuleAnalysis(clang::CompilerInstance const &, Target);
 
-    void HandleTranslationUnit(clang::ASTContext &);
+    void HandleTranslationUnit(clang::ASTContext &) override;
 
 
     ModuleAnalysis(ModuleAnalysis const &) = delete;

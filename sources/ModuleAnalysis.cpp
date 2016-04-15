@@ -177,11 +177,11 @@ protected:
 class DebugFunctionDeclarations
     : public ModuleVisitor {
 protected:
-    void OnFunctionDecl(clang::FunctionDecl const * const F) {
+    void OnFunctionDecl(clang::FunctionDecl const * const F) override {
         Functions.insert(F);
     }
 
-    void OnCXXMethodDecl(clang::CXXMethodDecl const * const F) {
+    void OnCXXMethodDecl(clang::CXXMethodDecl const * const F) override {
         Functions.insert(F);
     }
 
@@ -199,13 +199,13 @@ protected:
 class DebugVariableDeclarations
     : public ModuleVisitor {
 private:
-    void OnFunctionDecl(clang::FunctionDecl const * const F) {
+    void OnFunctionDecl(clang::FunctionDecl const * const F) override {
         for (auto && Variable: GetVariablesFromContext(F)) {
             Results.insert(Variable);
         }
     }
 
-    void OnCXXMethodDecl(clang::CXXMethodDecl const * const F) {
+    void OnCXXMethodDecl(clang::CXXMethodDecl const * const F) override {
         for (auto && Variable: GetVariablesFromContext(F, (! IsJustAMethod(F)))) {
             Results.insert(Variable);
         }
@@ -262,14 +262,14 @@ private:
 class AnalyseVariableUsage
     : public ModuleVisitor {
 private:
-    void OnFunctionDecl(clang::FunctionDecl const * const F) {
+    void OnFunctionDecl(clang::FunctionDecl const * const F) override {
         ScopeAnalysis const & Analysis = ScopeAnalysis::AnalyseThis(*(F->getBody()));
         for (auto && Variable: GetVariablesFromContext(F)) {
             State.Eval(Analysis, Variable);
         }
     }
 
-    void OnCXXMethodDecl(clang::CXXMethodDecl const * const F) {
+    void OnCXXMethodDecl(clang::CXXMethodDecl const * const F) override {
         clang::CXXRecordDecl const * const Parent = F->getParent();
         clang::CXXRecordDecl const * const RecordDecl =
             Parent->hasDefinition() ? Parent->getDefinition() : Parent->getCanonicalDecl();

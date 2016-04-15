@@ -63,7 +63,7 @@ private:
     }
 
     // ..:: Entry point for plugins ::..
-    std::unique_ptr<clang::ASTConsumer> CreateASTConsumer(clang::CompilerInstance & C, llvm::StringRef) {
+    std::unique_ptr<clang::ASTConsumer> CreateASTConsumer(clang::CompilerInstance & C, llvm::StringRef) override {
         return IsCPlusPlus(C)
             ? std::unique_ptr<clang::ASTConsumer>(new ModuleAnalysis(C, Debug))
             : std::unique_ptr<clang::ASTConsumer>(new NullConsumer());
@@ -71,7 +71,7 @@ private:
 
     // ..:: Entry point for plugins ::..
     bool ParseArgs(clang::CompilerInstance const &,
-                   std::vector<std::string> const & Args) {
+                   std::vector<std::string> const & Args) override {
         std::vector<char const *> ArgPtrs;
         {
             // make llvm::cl::ParseCommandLineOptions happy
