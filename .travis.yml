@@ -24,3 +24,11 @@ script:
   - mkdir target_dir
   - DESTDIR=target_dir make install
   - make package
+
+notifications:
+  webhooks:
+    urls:
+      - https://webhooks.gitter.im/e/6788df84412f2d288bb3
+    on_success: change
+    on_failure: always
+    on_start: never
