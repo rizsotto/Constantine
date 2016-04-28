@@ -1,7 +1,9 @@
 Constantine
 ===========
 
+[![Build Status](https://travis-ci.org/rizsotto/Constantine.svg?branch=master)](https://travis-ci.org/rizsotto/Constantine)
 [![Join the chat at https://gitter.im/rizsotto/Constantine](https://badges.gitter.im/rizsotto/Constantine.svg)](https://gitter.im/rizsotto/Constantine?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
+
 
 Constantine is a toy project to learn how to write Clang plugin.
 
