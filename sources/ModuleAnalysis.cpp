@@ -185,7 +185,7 @@ protected:
         Functions.insert(F);
     }
 
-    void Dump(clang::DiagnosticsEngine & DE) const {
+    void Dump(clang::DiagnosticsEngine & DE) const override {
         for (auto && Function: Functions) {
             ReportFunctionDeclaration(DE, Function);
         }
@@ -216,7 +216,7 @@ private:
         }
     }
 
-    void Dump(clang::DiagnosticsEngine & DE) const {
+    void Dump(clang::DiagnosticsEngine & DE) const override {
         for (auto && Result: Results) {
             ReportVariableDeclaration(DE, Result);
         }
@@ -319,7 +319,7 @@ private:
         }
     }
 
-    void Dump(clang::DiagnosticsEngine & DE) const {
+    void Dump(clang::DiagnosticsEngine & DE) const override {
         State.GenerateReports(DE);
         for (auto && Candidate: ConstCandidates) {
             if (IsFromMainModule(Candidate)) {
