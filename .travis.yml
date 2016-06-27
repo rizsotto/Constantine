@@ -5,12 +5,12 @@ sudo: false
 addons:
   apt:
     packages:
-      - clang-3.7
-      - libclang-3.7-dev
-      - llvm-3.7-tools
+      - clang-3.8
+      - libclang-3.8-dev
+      - llvm-3.8-tools
       - python-pip
     sources:
-      - llvm-toolchain-precise-3.7
+      - llvm-toolchain-precise-3.8
       - ubuntu-toolchain-r-test
 
 before_script:
@@ -18,7 +18,7 @@ before_script:
   - cd build
 
 script:
-  - cmake -DCMAKE_CXX_COMPILER=clang++-3.7 -DCPACK_GENERATOR="TGZ;DEB" -DLIT_MODULE="/usr/lib/llvm-3.7/build/utils/lit/lit.py" ..
+  - cmake -DCMAKE_CXX_COMPILER=clang++-3.8 -DCPACK_GENERATOR="TGZ;DEB" -DLIT_MODULE="/usr/lib/llvm-3.8/build/utils/lit/lit.py" ..
   - make all
   - make check
   - mkdir target_dir

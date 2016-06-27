@@ -22,34 +22,24 @@
 
 namespace {
 
-void GetVariablesFromRecord(clang::CXXRecordDecl const & Rec, Variables & Out) {
-    for (auto It(Rec.field_begin()), End(Rec.field_end()); It != End; ++It ) {
-        if (auto const D = clang::dyn_cast<clang::FieldDecl const>(*It)) {
-            Out.insert(D);
+std::set<clang::CXXRecordDecl const *> AllBase(clang::CXXRecordDecl const * Record) {
+    std::set<clang::CXXRecordDecl const *> Result;
+
+    llvm::SmallVector<clang::CXXRecordDecl const *, 8> Queue;
+    Queue.push_back(Record);
+
+    while (! Queue.empty()) {
+        auto const Current = Queue.pop_back_val();
+        for (const auto & BaseIt : Current->bases()) {
+            if (auto const * Record = BaseIt.getType()->getAs<clang::RecordType>()) {
+                if (auto const * Base = clang::cast_or_null<clang::CXXRecordDecl>(Record->getDecl()->getDefinition())) {
+                    Queue.push_back(Base);
+                }
+            }
         }
+        Result.insert(Current);
     }
-}
-
-// sytax given by clang api
-bool GetVariablesFromRecord(clang::CXXRecordDecl const * const Rec, void * State) {
-    Variables & Out = *((Variables*)State);
-    GetVariablesFromRecord(*Rec, Out);
-    return true;
-}
-
-void GetMethodsFromRecord(clang::CXXRecordDecl const & Rec, Methods & Out) {
-    for (auto It(Rec.method_begin()), End(Rec.method_end()); It != End; ++It) {
-        if (auto const D = clang::dyn_cast<clang::CXXMethodDecl const>(*It)) {
-            Out.insert(D->getCanonicalDecl());
-        }
-    }
-}
-
-// sytax given by clang api
-bool GetMethodsFromRecord(clang::CXXRecordDecl const * const Rec, void * State) {
-    Methods & Out = *((Methods*)State);
-    GetMethodsFromRecord(*Rec, Out);
-    return true;
+    return Result;
 }
 
 // Strip away parentheses and casts we don't care about.
@@ -129,8 +119,8 @@ clang::DeclaratorDecl const * GetDeclarationFromExpr(clang::Expr const * const E
 
 Variables GetVariablesFromContext(clang::DeclContext const * const F, bool const WithoutArgs) {
     Variables Result;
-    for (auto It(F->decls_begin()), End(F->decls_end()); It != End; ++It ) {
-        if (auto const D = clang::dyn_cast<clang::VarDecl const>(*It)) {
+    for (auto const & It : F->decls()) {
+        if (auto const D = clang::dyn_cast<clang::VarDecl const>(It)) {
             if (! (WithoutArgs && (clang::dyn_cast<clang::ParmVarDecl const>(D)))) {
                 Result.insert(D);
             }
@@ -139,17 +129,23 @@ Variables GetVariablesFromContext(clang::DeclContext const * const F, bool const
     return Result;
 }
 
-Variables GetVariablesFromRecord(clang::CXXRecordDecl const * const Rec) {
+Variables GetVariablesFromRecord(clang::CXXRecordDecl const * const Record) {
     Variables Result;
-    GetVariablesFromRecord(*Rec, Result);
-    Rec->forallBases(GetVariablesFromRecord, &Result);
+    for (auto const & RecordIt : AllBase(Record)) {
+        for (const auto & FieldIt : RecordIt->fields()) {
+            Result.insert(FieldIt);
+        }
+    }
     return Result;
 }
 
-Methods GetMethodsFromRecord(clang::CXXRecordDecl const * const Rec) {
+Methods GetMethodsFromRecord(clang::CXXRecordDecl const * const Record) {
     Methods Result;
-    GetMethodsFromRecord(*Rec, Result);
-    Rec->forallBases(GetMethodsFromRecord, &Result);
+    for (auto const & RecordIt : AllBase(Record)) {
+        for (auto const & MethodIt : RecordIt->methods()) {
+            Result.insert(MethodIt->getCanonicalDecl());
+        }
+    }
     return Result;
 }
 
