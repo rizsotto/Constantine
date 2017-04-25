@@ -89,8 +89,7 @@ private:
                         clEnumVal(FuncionDeclaration, "Enable function detection"),
                         clEnumVal(VariableDeclaration, "Enable variables detection"),
                         clEnumVal(VariableChanges, "Enable variable change detection"),
-                        clEnumVal(VariableUsages, "Enable variable usage detection"),
-                        clEnumValEnd));
+                        clEnumVal(VariableUsages, "Enable variable usage detection")));
 
             llvm::cl::ParseCommandLineOptions(ArgPtrs.size(), &ArgPtrs.front());
 
