@@ -1,29 +1,30 @@
 language: c++
 os: linux
 sudo: false
+dist: trusty
 
 addons:
   apt:
     packages:
-      - clang-3.9
-      - libclang-3.9-dev
-      - llvm-3.9-tools
+      - clang-4.0
+      - libclang-4.0-dev
+      - llvm-4.0-tools
       - python-pip
     sources:
-      - llvm-toolchain-precise-3.9
+      - llvm-toolchain-trusty-4.0
       - ubuntu-toolchain-r-test
 
 before_script:
-  - mkdir build
-  - cd build
+  - mkdir -p "$HOME/install" "$HOME/build"
+  - env
 
 script:
-  - cmake -DCMAKE_CXX_COMPILER=clang++-3.9 -DCPACK_GENERATOR="TGZ;DEB" -DLIT_MODULE="/usr/lib/llvm-3.9/build/utils/lit/lit.py" ..
-  - make all
-  - make check
-  - mkdir target_dir
-  - DESTDIR=target_dir make install
-  - make package
+  - cd "$HOME/build"
+  - cmake "$TRAVIS_BUILD_DIR" -DCMAKE_CXX_COMPILER=clang++-4.0 -DCPACK_GENERATOR="TGZ;DEB" -DLIT_MODULE="/usr/lib/llvm-4.0/build/utils/lit/lit.py"
+  - VERBOSE=1 make all
+  - VERBOSE=1 make check
+  - VERBOSE=1 make package
+  - VERBOSE=1 DESTDIR="$HOME/install" make install
 
 notifications:
   webhooks:
