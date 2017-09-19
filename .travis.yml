@@ -6,13 +6,13 @@ dist: trusty
 addons:
   apt:
     packages:
-      - clang-4.0
-      - libclang-4.0-dev
-      - llvm-4.0-tools
+      - clang-5.0
+      - libclang-5.0-dev
+      - llvm-5.0-tools
       - python-pip
     sources:
-      - llvm-toolchain-trusty-4.0
-      - ubuntu-toolchain-r-test
+      - sourceline: 'deb http://apt.llvm.org/trusty/ llvm-toolchain-trusty-5.0 main'
+        key_url: 'https://apt.llvm.org/llvm-snapshot.gpg.key'
 
 before_script:
   - mkdir -p "$HOME/install" "$HOME/build"
@@ -20,7 +20,7 @@ before_script:
 
 script:
   - cd "$HOME/build"
-  - cmake "$TRAVIS_BUILD_DIR" -DCMAKE_CXX_COMPILER=clang++-4.0 -DCPACK_GENERATOR="TGZ;DEB" -DLIT_MODULE="/usr/lib/llvm-4.0/build/utils/lit/lit.py"
+  - cmake "$TRAVIS_BUILD_DIR" -DCMAKE_CXX_COMPILER=clang++-5.0 -DCPACK_GENERATOR="TGZ;DEB" -DLIT_MODULE="/usr/lib/llvm-5.0/build/utils/lit/lit.py"
   - VERBOSE=1 make all
   - VERBOSE=1 make check
   - VERBOSE=1 make package
