@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 2.8)
 
 project(constantine CXX)
-set(CONSTANTINE_VERSION "5.0.0")
+set(CONSTANTINE_VERSION "6.0.0")
 
 set(CPACK_PACKAGE_NAME "constantine")
 set(CPACK_PACKAGE_CONTACT "László Nagy")
