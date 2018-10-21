@@ -39,14 +39,16 @@ public:
         return true;
     }
 
+    IsCXXThisExpr(IsCXXThisExpr const &) = delete;
+    IsCXXThisExpr(IsCXXThisExpr &&) noexcept = delete;
+    IsCXXThisExpr & operator=(IsCXXThisExpr const &) = delete;
+    IsCXXThisExpr & operator=(IsCXXThisExpr &&) noexcept = delete;
+
 private:
     IsCXXThisExpr()
         : clang::RecursiveASTVisitor<IsCXXThisExpr>()
         , Found(false)
     { }
-
-    IsCXXThisExpr(IsCXXThisExpr const &) = delete;
-    IsCXXThisExpr & operator=(IsCXXThisExpr const &) = delete;
 
 private:
     bool Found;

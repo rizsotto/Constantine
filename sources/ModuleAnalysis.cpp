@@ -46,18 +46,6 @@ void EmitWarningMessage(clang::DiagnosticsEngine & DE, char const (&Message)[N],
     DB.setForceEmit();
 }
 
-void ReportVariablePseudoConstness(clang::DiagnosticsEngine & DE, clang::DeclaratorDecl const * const V) {
-    EmitWarningMessage(DE, "variable '%0' could be declared as const", V);
-}
-
-void ReportFunctionPseudoConstness(clang::DiagnosticsEngine & DE, clang::DeclaratorDecl const * const V) {
-    EmitWarningMessage(DE, "function '%0' could be declared as const", V);
-}
-
-void ReportFunctionPseudoStaticness(clang::DiagnosticsEngine & DE, clang::DeclaratorDecl const * const V) {
-    EmitWarningMessage(DE, "function '%0' could be declared as static", V);
-}
-
 // Report function for debug functionality.
 template <unsigned N>
 void EmitNoteMessage(clang::DiagnosticsEngine & DE, char const (&Message)[N], clang::DeclaratorDecl const * const V) {
@@ -67,23 +55,14 @@ void EmitNoteMessage(clang::DiagnosticsEngine & DE, char const (&Message)[N], cl
     DB.setForceEmit();
 }
 
-void ReportVariableDeclaration(clang::DiagnosticsEngine & DE, clang::DeclaratorDecl const * const V) {
-    EmitNoteMessage(DE, "variable '%0' declared here", V);
-}
-
-void ReportFunctionDeclaration(clang::DiagnosticsEngine & DE, clang::DeclaratorDecl const * const V) {
-    EmitNoteMessage(DE, "function '%0' declared here", V);
-}
-
-
 bool IsJustAMethod(clang::CXXMethodDecl const * const F) {
     return
         (F->isUserProvided())
     &&  (! F->isVirtual())
     &&  (! F->isCopyAssignmentOperator())
-    &&  (0 == clang::dyn_cast<clang::CXXConstructorDecl const>(F))
-    &&  (0 == clang::dyn_cast<clang::CXXConversionDecl const>(F))
-    &&  (0 == clang::dyn_cast<clang::CXXDestructorDecl const>(F));
+    &&  (nullptr == clang::dyn_cast<clang::CXXConstructorDecl const>(F))
+    &&  (nullptr == clang::dyn_cast<clang::CXXConversionDecl const>(F))
+    &&  (nullptr == clang::dyn_cast<clang::CXXDestructorDecl const>(F));
 }
 
 
@@ -116,7 +95,7 @@ public:
     void GenerateReports(clang::DiagnosticsEngine & DE) const {
         for (auto && Variable: Candidates) {
             if (IsFromMainModule(Variable)) {
-                ReportVariablePseudoConstness(DE, Variable);
+                EmitWarningMessage(DE, "variable '%0' could be declared as const", Variable);
             }
         }
     }
@@ -147,8 +126,7 @@ public:
     typedef std::unique_ptr<ModuleVisitor> Ptr;
     static ModuleVisitor::Ptr CreateVisitor(Target);
 
-    virtual ~ModuleVisitor()
-    { }
+    virtual ~ModuleVisitor() = default;
 
 public:
     // public visitor method.
@@ -187,7 +165,7 @@ protected:
 
     void Dump(clang::DiagnosticsEngine & DE) const override {
         for (auto && Function: Functions) {
-            ReportFunctionDeclaration(DE, Function);
+            EmitNoteMessage(DE, "function '%0' declared here", Function);
         }
     }
 
@@ -218,7 +196,7 @@ private:
 
     void Dump(clang::DiagnosticsEngine & DE) const override {
         for (auto && Result: Results) {
-            ReportVariableDeclaration(DE, Result);
+            EmitNoteMessage(DE, "variable '%0' declared here", Result);
         }
     }
 
@@ -235,7 +213,7 @@ private:
         Analysis.DebugReferenced(DE);
     }
 
-    void Dump(clang::DiagnosticsEngine & DE) const {
+    void Dump(clang::DiagnosticsEngine & DE) const override {
         for (auto && Function: Functions) {
             ReportVariableUsage(DE, Function);
         }
@@ -251,7 +229,7 @@ private:
         Analysis.DebugChanged(DE);
     }
 
-    void Dump(clang::DiagnosticsEngine & DE) const {
+    void Dump(clang::DiagnosticsEngine & DE) const override {
         for (auto && Function: Functions) {
             ReportVariableUsage(DE, Function);
         }
@@ -323,12 +301,12 @@ private:
         State.GenerateReports(DE);
         for (auto && Candidate: ConstCandidates) {
             if (IsFromMainModule(Candidate)) {
-                ReportFunctionPseudoConstness(DE, Candidate);
+                EmitWarningMessage(DE, "function '%0' could be declared as const", Candidate);
             }
         }
         for (auto && Candidate: StaticCandidates) {
             if (IsFromMainModule(Candidate)) {
-                ReportFunctionPseudoStaticness(DE, Candidate);
+                EmitWarningMessage(DE, "function '%0' could be declared as static", Candidate);
             }
         }
     }

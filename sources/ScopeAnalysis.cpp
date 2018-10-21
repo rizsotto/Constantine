@@ -29,8 +29,8 @@
 
 namespace {
 
-static clang::QualType const NoType = clang::QualType();
-static clang::SourceRange const NoRange = clang::SourceRange();
+clang::QualType const NoType = clang::QualType();
+clang::SourceRange const NoRange = clang::SourceRange();
 
 // Usage extract method implemented in visitor style.
 class UsageExtractor
@@ -137,7 +137,7 @@ void DumpUsageMapEntry(UsageRefsMap::value_type const & Var
 class VariableChangeCollector
     : public clang::RecursiveASTVisitor<VariableChangeCollector> {
 public:
-    VariableChangeCollector(UsageRefsMap & Out)
+    explicit VariableChangeCollector(UsageRefsMap & Out)
         : clang::RecursiveASTVisitor<VariableChangeCollector>()
         , Results(Out)
     { }
@@ -251,7 +251,7 @@ private:
 class VariableAccessCollector
     : public clang::RecursiveASTVisitor<VariableAccessCollector> {
 public:
-    VariableAccessCollector(UsageRefsMap & Out)
+    explicit VariableAccessCollector(UsageRefsMap & Out)
         : clang::RecursiveASTVisitor<VariableAccessCollector>()
         , Results(Out)
     { }
@@ -297,13 +297,13 @@ bool ScopeAnalysis::WasReferenced(clang::DeclaratorDecl const * const Decl) cons
 }
 
 void ScopeAnalysis::DebugChanged(clang::DiagnosticsEngine & DE) const {
-    for (auto const Entry : Changed) {
+    for (auto const &Entry : Changed) {
         DumpUsageMapEntry(Entry, "variable '%0' with type '%1' was changed", DE);
     }
 }
 
 void ScopeAnalysis::DebugReferenced(clang::DiagnosticsEngine & DE) const {
-    for (auto const Entry : Used) {
+    for (auto const &Entry : Used) {
         DumpUsageMapEntry(Entry, "symbol '%0' was used with type '%1'", DE);
     }
 }
