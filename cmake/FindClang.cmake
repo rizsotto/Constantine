@@ -13,8 +13,6 @@ function(set_clang_definitions config_cmd)
   string(REGEX MATCHALL "(-U[^ ]*)" uflags ${llvm_cppflags})
   list(APPEND cxxflags ${dflags})
   list(APPEND cxxflags ${uflags})
-  list(APPEND cxxflags -fno-rtti)
-  list(APPEND cxxflags -fno-exceptions)
 
   set(CLANG_DEFINITIONS ${cxxflags} PARENT_SCOPE)
 endfunction()
