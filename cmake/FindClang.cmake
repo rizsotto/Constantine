@@ -58,7 +58,7 @@ endfunction()
 
 
 find_program(LLVM_CONFIG
-  NAMES llvm-config-6.0 llvm-config-5.1 llvm-config-5.0 llvm-config-4.0 llvm-config-3.9 llvm-config-3.8 llvm-config
+  NAMES llvm-config-7.0 llvm-config-6.0 llvm-config-5.1 llvm-config-5.0 llvm-config-4.0 llvm-config-3.9 llvm-config-3.8 llvm-config
   PATHS ENV LLVM_PATH)
 if(LLVM_CONFIG)
   message(STATUS "llvm-config found : ${LLVM_CONFIG}")
@@ -67,7 +67,7 @@ else()
 endif()
 
 find_program(CLANG_EXECUTABLE
-  NAMES clang-6.0 clang-5.1 clang-5.0 clang-4.0 clang-3.9 clang-3.8 clang
+  NAMES clang-7.0 clang-6.0 clang-5.1 clang-5.0 clang-4.0 clang-3.9 clang-3.8 clang
   PATHS ENV LLVM_PATH)
 if(CLANG_EXECUTABLE)
   message(STATUS "clang found : ${CLANG_EXECUTABLE}")

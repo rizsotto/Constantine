@@ -18,7 +18,7 @@ endif()
 
 
 project(constantine
-        VERSION 6.0.0
+        VERSION 7.0.0
         DESCRIPTION "A plugin for Clang compiler."
         LANGUAGES CXX)
 
