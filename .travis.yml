@@ -1,4 +1,4 @@
-language: c++
+language: python
 os: linux
 sudo: false
 dist: xenial
@@ -13,7 +13,11 @@ addons:
       - clang-8
       - libclang-8-dev
       - llvm-8-tools
-      - python-pip
+
+install:
+  - pip --version
+  - pip install --upgrade pip
+  - pip install lit
 
 before_script:
   - mkdir -p "$HOME/install" "$HOME/build"
@@ -21,7 +25,7 @@ before_script:
 
 script:
   - cd "$HOME/build"
-  - cmake "$TRAVIS_BUILD_DIR" -DCMAKE_CXX_COMPILER=clang++-8 -DCPACK_GENERATOR="TGZ;DEB" -DLIT_MODULE="/usr/lib/llvm-8/build/utils/lit/lit.py"
+  - cmake "$TRAVIS_BUILD_DIR" -DCMAKE_CXX_COMPILER=clang++-8 -DCPACK_GENERATOR="TGZ;DEB"
   - VERBOSE=1 make all
   - VERBOSE=1 make check
   - VERBOSE=1 make package
