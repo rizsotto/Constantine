@@ -41,7 +41,7 @@ template <unsigned N>
 void EmitWarningMessage(clang::DiagnosticsEngine & DE, char const (&Message)[N], clang::DeclaratorDecl const * const V) {
     unsigned const Id =
         DE.getCustomDiagID(clang::DiagnosticsEngine::Warning, Message);
-    clang::DiagnosticBuilder const DB = DE.Report(V->getLocStart(), Id);
+    clang::DiagnosticBuilder const DB = DE.Report(V->getBeginLoc(), Id);
     DB << V->getNameAsString();
     DB.setForceEmit();
 }
@@ -50,7 +50,7 @@ void EmitWarningMessage(clang::DiagnosticsEngine & DE, char const (&Message)[N],
 template <unsigned N>
 void EmitNoteMessage(clang::DiagnosticsEngine & DE, char const (&Message)[N], clang::DeclaratorDecl const * const V) {
     unsigned const Id = DE.getCustomDiagID(clang::DiagnosticsEngine::Note, Message);
-    clang::DiagnosticBuilder const DB = DE.Report(V->getLocStart(), Id);
+    clang::DiagnosticBuilder const DB = DE.Report(V->getBeginLoc(), Id);
     DB << V->getNameAsString();
     DB.setForceEmit();
 }
