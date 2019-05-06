@@ -1,18 +1,18 @@
 language: c++
 os: linux
 sudo: false
-dist: trusty
+dist: xenial
 
 addons:
   apt:
     sources:
-      - llvm-toolchain-trusty-6.0
+      - llvm-toolchain-xenial-8
       - ubuntu-toolchain-r-test
     packages:
       - cmake
-      - clang-6.0
-      - libclang-6.0-dev
-      - llvm-6.0-tools
+      - clang-8
+      - libclang-8-dev
+      - llvm-8-tools
       - python-pip
 
 before_script:
@@ -21,7 +21,7 @@ before_script:
 
 script:
   - cd "$HOME/build"
-  - cmake "$TRAVIS_BUILD_DIR" -DCMAKE_CXX_COMPILER=clang++-6.0 -DCPACK_GENERATOR="TGZ;DEB" -DLIT_MODULE="/usr/lib/llvm-6.0/build/utils/lit/lit.py"
+  - cmake "$TRAVIS_BUILD_DIR" -DCMAKE_CXX_COMPILER=clang++-8 -DCPACK_GENERATOR="TGZ;DEB" -DLIT_MODULE="/usr/lib/llvm-8/build/utils/lit/lit.py"
   - VERBOSE=1 make all
   - VERBOSE=1 make check
   - VERBOSE=1 make package
