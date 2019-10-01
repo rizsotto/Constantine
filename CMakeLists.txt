@@ -47,5 +47,5 @@ set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 find_package(Clang REQUIRED)
 find_package(Lit)
 
-add_subdirectory(sources)
+add_subdirectory(src)
 add_subdirectory(test)
