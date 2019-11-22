@@ -1,4 +1,4 @@
-// RUN: %clang_verify %s
+// RUN: %verify_const %s
 
 void test_1() {
     int i = 0; // expected-warning {{variable 'i' could be declared as const}}

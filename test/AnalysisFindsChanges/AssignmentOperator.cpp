@@ -1,4 +1,4 @@
-// RUN: %clang_verify %change %s
+// RUN: %verify_variable_changes %s
 
 struct TestType {
     TestType() { }

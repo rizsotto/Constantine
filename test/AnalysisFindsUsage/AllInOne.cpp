@@ -1,4 +1,4 @@
-// RUN: %clang_verify %usage %s
+// RUN: %verify_variable_usages %s
 
 void simple_type_usage() {
     int const k = 0;

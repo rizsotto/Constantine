@@ -1,4 +1,4 @@
-// RUN: %clang_verify %s
+// RUN: %verify_const %s
 
 void do_mutating_through_reference() {
     int i = 0;

@@ -1,4 +1,4 @@
-// RUN: %clang_verify %s
+// RUN: %verify_const %s
 
 struct TestType {
     int m_i;

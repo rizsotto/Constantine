@@ -1,4 +1,4 @@
-// RUN: %clang_verify %show_functions %s
+// RUN: %show_functions %s
 
 template <typename T>
 class A {

@@ -19,10 +19,7 @@
 
 #include "libconstantine_a/ModuleAnalysis.hpp"
 
-#include <iterator>
 #include <memory>
-
-#include <llvm/Support/CommandLine.h>
 
 #include <clang/Frontend/FrontendPluginRegistry.h>
 #include <clang/Frontend/CompilerInstance.h>
@@ -31,78 +28,43 @@
 
 namespace {
 
-// Do nothing, just enjoy the non C++ code.
-class NullConsumer : public clang::ASTConsumer {
-public:
-    NullConsumer()
-        : clang::ASTConsumer()
-    { }
-};
+    // Do nothing, just enjoy the non C++ code.
+    class NullConsumer : public clang::ASTConsumer {
+    public:
+        NullConsumer() : clang::ASTConsumer() {}
+    };
 
-static char const * const plugin_name = "constantine";
+    // The const analyser plugin...
+    class Plugin : public clang::PluginASTAction {
+    public:
+        Plugin() : clang::PluginASTAction() {}
 
-// The const analyser plugin... Implements the neccessary interface
-// to be a plugin. Parse command line arguments and dispatch the
-// real work to other classes.
-class Plugin
-    : public clang::PluginASTAction {
-public:
-    Plugin()
-        : clang::PluginASTAction()
-        , Debug(PseudoConstness)
-    { }
+        Plugin(Plugin const &) = delete;
 
-    Plugin(Plugin const &) = delete;
-    Plugin & operator=(Plugin const &) = delete;
+        Plugin &operator=(Plugin const &) = delete;
 
-private:
-    // Decide wheater the compiler was invoked as C++ compiler or not.
-    static bool IsCPlusPlus(clang::CompilerInstance const & Compiler) {
-        clang::LangOptions const Opts = Compiler.getLangOpts();
-        return Opts.CPlusPlus;
-    }
-
-    // ..:: Entry point for plugins ::..
-    std::unique_ptr<clang::ASTConsumer> CreateASTConsumer(clang::CompilerInstance & C, llvm::StringRef) override {
-        return IsCPlusPlus(C)
-            ? std::unique_ptr<clang::ASTConsumer>(new ModuleAnalysis(C, Debug))
-            : std::unique_ptr<clang::ASTConsumer>(new NullConsumer());
-    }
-
-    // ..:: Entry point for plugins ::..
-    bool ParseArgs(clang::CompilerInstance const &,
-                   std::vector<std::string> const & Args) override {
-        std::vector<char const *> ArgPtrs;
-        {
-            // make llvm::cl::ParseCommandLineOptions happy
-            ArgPtrs.push_back(plugin_name);
-            for (auto && Arg : Args) {
-                ArgPtrs.push_back(Arg.c_str());
-            }
+    private:
+        // Decide whether the compiler was invoked as C++ compiler or not.
+        static bool IsCPlusPlus(clang::CompilerInstance const &Compiler) {
+            clang::LangOptions const& Opts = Compiler.getLangOpts();
+            return Opts.CPlusPlus;
         }
-        {
-            static llvm::cl::opt<Target> const
-                DebugParser("debug-constantine",
-                    llvm::cl::desc("Set the debugging level for Constantine plugin:"),
-                    llvm::cl::init(PseudoConstness),
-                    llvm::cl::values(
-                        clEnumVal(FuncionDeclaration, "Enable function detection"),
-                        clEnumVal(VariableDeclaration, "Enable variables detection"),
-                        clEnumVal(VariableChanges, "Enable variable change detection"),
-                        clEnumVal(VariableUsages, "Enable variable usage detection")));
 
-            llvm::cl::ParseCommandLineOptions(ArgPtrs.size(), &ArgPtrs.front());
-
-            Debug = DebugParser;
+        // ..:: Entry point for plugins ::..
+        std::unique_ptr<clang::ASTConsumer> CreateASTConsumer(clang::CompilerInstance &C, llvm::StringRef) override {
+            return IsCPlusPlus(C)
+                   ? std::unique_ptr<clang::ASTConsumer>(new ModuleAnalysis(C, PseudoConstness))
+                   : std::unique_ptr<clang::ASTConsumer>(new NullConsumer());
         }
-        return true;
-    }
 
-private:
-    Target Debug;
-};
+        // ..:: Entry point for plugins ::..
+        bool ParseArgs(clang::CompilerInstance const &,
+                       std::vector<std::string> const &Args) override {
+            return true;
+        }
+    };
 
 } // namespace anonymous
 
 static clang::FrontendPluginRegistry::Add<Plugin>
-    Register(plugin_name, "suggest const usage");
+        Register("constantine", "suggest const usage");

@@ -1,4 +1,4 @@
-// RUN: %clang_verify %s
+// RUN: %verify_const %s
 // expected-no-diagnostics
 
 void mutator(int & i, int * j = 0) {

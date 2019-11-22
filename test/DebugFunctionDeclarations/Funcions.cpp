@@ -1,4 +1,4 @@
-// RUN: %clang_verify %show_functions %s
+// RUN: %show_functions %s
 
 void f1() { // expected-note {{function 'f1' declared here}}
 }

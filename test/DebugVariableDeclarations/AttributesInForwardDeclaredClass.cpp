@@ -1,4 +1,4 @@
-// RUN: %clang_verify %show_variables %s
+// RUN: %show_variables %s
 
 class ForwardDeclared;
 
