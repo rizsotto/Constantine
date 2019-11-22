@@ -17,12 +17,12 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "ModuleAnalysis.hpp"
+#include "libconstantine_a/ModuleAnalysis.hpp"
 
 #include <iterator>
 #include <memory>
 
-#include "llvm/Support/CommandLine.h"
+#include <llvm/Support/CommandLine.h>
 
 #include <clang/Frontend/FrontendPluginRegistry.h>
 #include <clang/Frontend/CompilerInstance.h>
