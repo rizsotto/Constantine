@@ -262,7 +262,7 @@ public:
         return true;
     }
 
-    bool VisitMemberExpr(clang::MemberExpr * const Stmt) {
+    bool VisitMemberExpr(clang::MemberExpr const * const Stmt) {
         if (IsCXXThisExpr::Check(Stmt)) {
             Register(Results, Stmt);
         }

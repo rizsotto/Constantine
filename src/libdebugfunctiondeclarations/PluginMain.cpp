@@ -53,7 +53,7 @@ namespace {
         // ..:: Entry point for plugins ::..
         std::unique_ptr<clang::ASTConsumer> CreateASTConsumer(clang::CompilerInstance &C, llvm::StringRef) override {
             return IsCPlusPlus(C)
-                   ? std::unique_ptr<clang::ASTConsumer>(new ModuleAnalysis(C, FuncionDeclaration))
+                   ? std::unique_ptr<clang::ASTConsumer>(new ModuleAnalysis(C, FunctionDeclaration))
                    : std::unique_ptr<clang::ASTConsumer>(new NullConsumer());
         }
 

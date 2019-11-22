@@ -23,7 +23,7 @@
 #include <clang/Frontend/CompilerInstance.h>
 
 enum Target
-    { FuncionDeclaration
+    { FunctionDeclaration
     , VariableDeclaration
     , VariableChanges
     , VariableUsages

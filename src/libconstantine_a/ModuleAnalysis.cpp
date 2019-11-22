@@ -25,7 +25,6 @@
 #include "IsFromMainModule.hpp"
 
 #include <functional>
-#include <iterator>
 #include <map>
 #include <memory>
 
@@ -39,8 +38,7 @@ namespace {
 // Report function for pseudo constness analysis.
 template <unsigned N>
 void EmitWarningMessage(clang::DiagnosticsEngine & DE, char const (&Message)[N], clang::DeclaratorDecl const * const V) {
-    unsigned const Id =
-        DE.getCustomDiagID(clang::DiagnosticsEngine::Warning, Message);
+    unsigned const Id = DE.getCustomDiagID(clang::DiagnosticsEngine::Warning, Message);
     clang::DiagnosticBuilder const DB = DE.Report(V->getBeginLoc(), Id);
     DB << V->getNameAsString();
     DB.setForceEmit();
@@ -82,7 +80,7 @@ public:
 
     void Eval(ScopeAnalysis const & Analysis, clang::DeclaratorDecl const * const V) {
         if (Analysis.WasChanged(V)) {
-            for (auto && Variable: GetReferedVariables(V)) {
+            for (auto && Variable: GetReferredVariables(V)) {
                 RegisterChange(Variable);
             }
         } else if (Changed.end() == Changed.find(V)) {
@@ -331,7 +329,7 @@ private:
 
 ModuleVisitor::Ptr ModuleVisitor::CreateVisitor(Target const State) {
     switch (State) {
-    case FuncionDeclaration :
+    case FunctionDeclaration :
         return ModuleVisitor::Ptr( new DebugFunctionDeclarations() );
     case VariableDeclaration :
         return ModuleVisitor::Ptr( new DebugVariableDeclarations() );

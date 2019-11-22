@@ -22,11 +22,11 @@
 
 namespace {
 
-std::set<clang::CXXRecordDecl const *> AllBase(clang::CXXRecordDecl const * Record) {
+std::set<clang::CXXRecordDecl const *> AllBase(clang::CXXRecordDecl const * Decl) {
     std::set<clang::CXXRecordDecl const *> Result;
 
     llvm::SmallVector<clang::CXXRecordDecl const *, 8> Queue;
-    Queue.push_back(Record);
+    Queue.push_back(Decl);
 
     while (! Queue.empty()) {
         auto const Current = Queue.pop_back_val();
@@ -86,7 +86,7 @@ std::set<clang::Expr const *> CollectRefereeExpr(clang::Expr const * const E) {
             } else if (auto ME = clang::dyn_cast<clang::MemberExpr const>(Stripped)) {
                 // Dig into member variable access to register the outer variable
                 while (ME) {
-                    if (decltype(ME) const Candidate = clang::dyn_cast<clang::MemberExpr const>(ME->getBase())) {
+                    if (auto const Candidate = clang::dyn_cast<clang::MemberExpr const>(ME->getBase())) {
                         ME = Candidate;
                         continue;
                     }
@@ -149,7 +149,7 @@ Methods GetMethodsFromRecord(clang::CXXRecordDecl const * const Record) {
     return Result;
 }
 
-Variables GetReferedVariables(clang::DeclaratorDecl const * const D) {
+Variables GetReferredVariables(clang::DeclaratorDecl const * const D) {
     Variables Result;
 
     Variables Works;
@@ -187,7 +187,7 @@ Variables GetMemberVariablesAndReferences(clang::CXXRecordDecl const * const Rec
     Variables Members = GetVariablesFromRecord(Rec);
     Variables const & Locals = GetVariablesFromContext(F);
     for (auto const &Local : Locals) {
-        Variables const &Refs = GetReferedVariables(Local);
+        Variables const &Refs = GetReferredVariables(Local);
         for (auto ReIt(Refs.begin()), ReEnd(Refs.end()); ReIt != ReEnd; ++ReIt) {
             if (Members.count(*ReIt)) {
                 Members.insert(Refs.begin(), Refs.end());
