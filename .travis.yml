@@ -1,31 +1,61 @@
 language: python
-os: linux
-sudo: false
-dist: xenial
 
-addons:
-  apt:
-    sources:
-      - llvm-toolchain-xenial-8
-      - ubuntu-toolchain-r-test
-    packages:
-      - cmake
-      - clang-8
-      - libclang-8-dev
-      - llvm-8-tools
+matrix:
+  include:
+    - os: linux
+      sudo: false
+      dist: xenial
+      addons:
+        apt:
+          sources:
+            - llvm-toolchain-xenial-8
+            - ubuntu-toolchain-r-test
+          packages:
+            - python-pip
+            - cmake
+            - clang-8
+            - libclang-8-dev
+            - llvm-8
+            - llvm-8-dev
+            - llvm-8-tools
+      env:
+        - CC=clang-8
+        - CXX=clang++-8
+        - PATH="/home/travis/bin:/usr/local/cmake-3.12.4/bin:/bin:/usr/bin:/usr/local/bin"
+#    - os: osx
+#      osx_image: xcode11.2
+#      language: generic
+#      addons:
+#        homebrew:
+#          packages:
+#            - pipenv
+#            - llvm@8
+#      env:
+#        - CC=clang
+#        - CXX=clang++
+
+#before_install:
+#  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then
+#      csrutil status || true;
+#      brew update;
+#    fi
 
 install:
-  - pip --version
-  - pip install --upgrade pip
-  - pip install lit
+#  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then
+#      pipenv install lit;
+#    fi
+  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then
+      pip install lit;
+    fi
 
 before_script:
+  - uname
+  - env | sort
   - mkdir -p "$HOME/install" "$HOME/build"
-  - env
+  - cd "$HOME/build"
 
 script:
-  - cd "$HOME/build"
-  - cmake "$TRAVIS_BUILD_DIR" -DCMAKE_CXX_COMPILER=clang++-8 -DCPACK_GENERATOR="TGZ;DEB"
+  - cmake "$TRAVIS_BUILD_DIR" -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCMAKE_CXX_COMPILER="$CXX" -DCPACK_GENERATOR="TGZ;DEB"
   - VERBOSE=1 make all
   - VERBOSE=1 make check
   - VERBOSE=1 make package
