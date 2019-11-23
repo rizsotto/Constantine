@@ -28,12 +28,6 @@
 
 namespace {
 
-    // Do nothing, just enjoy the non C++ code.
-    class NullConsumer : public clang::ASTConsumer {
-    public:
-        NullConsumer() : clang::ASTConsumer() {}
-    };
-
     // The const analyser plugin...
     class Plugin : public clang::PluginASTAction {
     public:
@@ -54,7 +48,7 @@ namespace {
         std::unique_ptr<clang::ASTConsumer> CreateASTConsumer(clang::CompilerInstance &C, llvm::StringRef) override {
             return IsCPlusPlus(C)
                    ? std::unique_ptr<clang::ASTConsumer>(new ModuleAnalysis(C))
-                   : std::unique_ptr<clang::ASTConsumer>(new NullConsumer());
+                   : std::make_unique<clang::ASTConsumer>();
         }
 
         // ..:: Entry point for plugins ::..

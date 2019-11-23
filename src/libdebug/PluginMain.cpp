@@ -31,12 +31,6 @@ namespace {
 
     char const * const plugin_name = "constantine";
 
-    // Do nothing, just enjoy the non C++ code.
-    class NullConsumer : public clang::ASTConsumer {
-    public:
-        NullConsumer() : clang::ASTConsumer() {}
-    };
-
     // The debug plugin...
     class Plugin : public clang::PluginASTAction {
     public:
@@ -60,7 +54,7 @@ namespace {
         std::unique_ptr<clang::ASTConsumer> CreateASTConsumer(clang::CompilerInstance &C, llvm::StringRef) override {
             return IsCPlusPlus(C)
                    ? std::unique_ptr<clang::ASTConsumer>(new ModuleAnalysis(C, Debug))
-                   : std::unique_ptr<clang::ASTConsumer>(new NullConsumer());
+                   : std::make_unique<clang::ASTConsumer>();
         }
 
         // ..:: Entry point for plugins ::..
