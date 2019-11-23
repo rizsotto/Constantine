@@ -206,7 +206,7 @@ public:
 
     // Objects are mutated when non const operator called.
     bool VisitCXXOperatorCallExpr(clang::CXXOperatorCallExpr const * const Stmt) {
-        // the implimentation relies on that here the first argument
+        // the implementation relies on that here the first argument
         // is the 'this', while it was not the case with CXXMethodDecl.
         if (auto const F = Stmt->getDirectCallee()) {
             if (auto const MD = clang::dyn_cast<clang::CXXMethodDecl const>(F)) {
