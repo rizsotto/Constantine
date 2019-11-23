@@ -122,6 +122,7 @@ class ModuleVisitor
     : public clang::RecursiveASTVisitor<ModuleVisitor> {
 public:
     typedef std::unique_ptr<ModuleVisitor> Ptr;
+
     static ModuleVisitor::Ptr CreateVisitor(Target);
 
     virtual ~ModuleVisitor() = default;
@@ -345,7 +346,13 @@ ModuleVisitor::Ptr ModuleVisitor::CreateVisitor(Target const State) {
 } // namespace anonymous
 
 
-ModuleAnalysis::ModuleAnalysis(clang::CompilerInstance const & Compiler, Target const T)
+ModuleAnalysis::ModuleAnalysis(clang::CompilerInstance const &Compiler)
+    : clang::ASTConsumer()
+    , Reporter(Compiler.getDiagnostics())
+    , State(PseudoConstness)
+{ }
+
+ModuleAnalysis::ModuleAnalysis(clang::CompilerInstance const &Compiler, Target const T)
     : clang::ASTConsumer()
     , Reporter(Compiler.getDiagnostics())
     , State(T)

@@ -33,6 +33,7 @@ enum Target
 // It runs the pseudo const analysis on the given translation unit.
 class ModuleAnalysis : public clang::ASTConsumer {
 public:
+    ModuleAnalysis(clang::CompilerInstance const &);
     ModuleAnalysis(clang::CompilerInstance const &, Target);
 
     void HandleTranslationUnit(clang::ASTContext &) override;

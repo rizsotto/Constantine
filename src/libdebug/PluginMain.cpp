@@ -21,6 +21,7 @@
 
 #include <memory>
 
+#include <llvm/Support/CommandLine.h>
 #include <clang/Frontend/FrontendPluginRegistry.h>
 #include <clang/Frontend/CompilerInstance.h>
 #include <clang/AST/ASTConsumer.h>
@@ -28,16 +29,21 @@
 
 namespace {
 
+    char const * const plugin_name = "constantine";
+
     // Do nothing, just enjoy the non C++ code.
     class NullConsumer : public clang::ASTConsumer {
     public:
         NullConsumer() : clang::ASTConsumer() {}
     };
 
-    // The function declaration debug plugin...
+    // The debug plugin...
     class Plugin : public clang::PluginASTAction {
     public:
-        Plugin() : clang::PluginASTAction() {}
+        Plugin()
+        : clang::PluginASTAction()
+        , Debug(PseudoConstness)
+        {}
 
         Plugin(Plugin const &) = delete;
 
@@ -53,18 +59,44 @@ namespace {
         // ..:: Entry point for plugins ::..
         std::unique_ptr<clang::ASTConsumer> CreateASTConsumer(clang::CompilerInstance &C, llvm::StringRef) override {
             return IsCPlusPlus(C)
-                   ? std::unique_ptr<clang::ASTConsumer>(new ModuleAnalysis(C, FunctionDeclaration))
+                   ? std::unique_ptr<clang::ASTConsumer>(new ModuleAnalysis(C, Debug))
                    : std::unique_ptr<clang::ASTConsumer>(new NullConsumer());
         }
 
         // ..:: Entry point for plugins ::..
         bool ParseArgs(clang::CompilerInstance const &,
                        std::vector<std::string> const &Args) override {
+            std::vector<char const *> ArgPtrs;
+            {
+                // make llvm::cl::ParseCommandLineOptions happy
+                ArgPtrs.push_back(plugin_name);
+                for (auto && Arg : Args) {
+                    ArgPtrs.push_back(Arg.c_str());
+                }
+            }
+            {
+                static llvm::cl::opt<Target> const
+                    DebugParser("mode",
+                        llvm::cl::desc("Set the debugging level for Constantine plugin:"),
+                        llvm::cl::values(
+                            clEnumVal(FunctionDeclaration, "Enable function detection"),
+                            clEnumVal(VariableDeclaration, "Enable variables detection"),
+                            clEnumVal(VariableChanges, "Enable variable change detection"),
+                            clEnumVal(VariableUsages, "Enable variable usage detection")),
+                        llvm::cl::Required);
+
+                llvm::cl::ParseCommandLineOptions(ArgPtrs.size(), &ArgPtrs.front());
+
+                Debug = DebugParser;
+            }
             return true;
         }
+
+    private:
+        Target Debug;
     };
 
 } // namespace anonymous
 
 static clang::FrontendPluginRegistry::Add<Plugin>
-    Register("constantine", "suggest const usage");
+        Register(plugin_name, "debug constantine plugin functionality");
