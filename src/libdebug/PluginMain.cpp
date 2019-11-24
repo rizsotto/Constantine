@@ -17,7 +17,7 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "libconstantine_a/ModuleAnalysis.hpp"
+#include "DebugModuleAnalysis.hpp"
 
 #include <memory>
 
@@ -36,7 +36,7 @@ namespace {
     public:
         Plugin()
         : clang::PluginASTAction()
-        , Debug(PseudoConstness)
+        , Debug(VariableDeclaration)
         {}
 
         Plugin(Plugin const &) = delete;
@@ -53,7 +53,7 @@ namespace {
         // ..:: Entry point for plugins ::..
         std::unique_ptr<clang::ASTConsumer> CreateASTConsumer(clang::CompilerInstance &C, llvm::StringRef) override {
             return IsCPlusPlus(C)
-                   ? std::unique_ptr<clang::ASTConsumer>(new ModuleAnalysis(C, Debug))
+                   ? std::unique_ptr<clang::ASTConsumer>(new DebugModuleAnalysis(C, Debug))
                    : std::make_unique<clang::ASTConsumer>();
         }
 

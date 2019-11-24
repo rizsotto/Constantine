@@ -1,4 +1,6 @@
 add_library(debug SHARED
+        DebugModuleAnalysis.hpp
+        DebugModuleAnalysis.cpp
         PluginMain.cpp)
 
 target_link_libraries(debug constantine_a)
