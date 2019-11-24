@@ -24,7 +24,6 @@
 #include "IsCXXThisExpr.hpp"
 #include "IsFromMainModule.hpp"
 
-#include <functional>
 #include <map>
 #include <memory>
 
@@ -44,16 +43,7 @@ void EmitWarningMessage(clang::DiagnosticsEngine & DE, char const (&Message)[N],
     DB.setForceEmit();
 }
 
-// Report function for debug functionality.
-template <unsigned N>
-void EmitNoteMessage(clang::DiagnosticsEngine & DE, char const (&Message)[N], clang::DeclaratorDecl const * const V) {
-    unsigned const Id = DE.getCustomDiagID(clang::DiagnosticsEngine::Note, Message);
-    clang::DiagnosticBuilder const DB = DE.Report(V->getBeginLoc(), Id);
-    DB << V->getNameAsString();
-    DB.setForceEmit();
-}
-
-bool IsJustAMethod(clang::CXXMethodDecl const * const F) {
+bool CanThisMethodSignatureChange(clang::CXXMethodDecl const * const F) {
     return
         (F->isUserProvided())
     &&  (! F->isVirtual())
@@ -114,21 +104,13 @@ private:
 };
 
 
-// Base class for analysis. Implement function declaration visitor, which visit
-// functions only once. The traversal algorithm is calling all methods, which is
-// not desired. In case of a CXXMethodDecl, it was calling the VisitFunctionDecl
-// and the VisitCXXMethodDecl as well. This dispatching is reworked in this class.
-class ModuleVisitor
-    : public clang::RecursiveASTVisitor<ModuleVisitor> {
+class PseudoConstnessAnalysis
+    : public clang::RecursiveASTVisitor<PseudoConstnessAnalysis> {
 public:
-    typedef std::unique_ptr<ModuleVisitor> Ptr;
-
-    static ModuleVisitor::Ptr CreateVisitor(Target);
-
-    virtual ~ModuleVisitor() = default;
-
-public:
-    // public visitor method.
+    // Implement function declaration visitor, which visit functions only once.
+    // The traversal algorithm is calling all methods, which is not desired.
+    // In case of a CXXMethodDecl, it was calling the VisitFunctionDecl and
+    // the VisitCXXMethodDecl as well. This dispatching is reworked in this class.
     bool VisitFunctionDecl(clang::FunctionDecl const * const F) {
         if (! (F->isThisDeclarationADefinition()))
             return true;
@@ -141,119 +123,21 @@ public:
         return true;
     }
 
-public:
-    // interface methods with different visibilities.
-    virtual void Dump(clang::DiagnosticsEngine &) const = 0;
-
-protected:
-    virtual void OnFunctionDecl(clang::FunctionDecl const *) = 0;
-    virtual void OnCXXMethodDecl(clang::CXXMethodDecl const *) = 0;
-};
-
-
-class DebugFunctionDeclarations
-    : public ModuleVisitor {
-protected:
-    void OnFunctionDecl(clang::FunctionDecl const * const F) override {
-        Functions.insert(F);
-    }
-
-    void OnCXXMethodDecl(clang::CXXMethodDecl const * const F) override {
-        Functions.insert(F);
-    }
-
-    void Dump(clang::DiagnosticsEngine & DE) const override {
-        for (auto && Function: Functions) {
-            EmitNoteMessage(DE, "function '%0' declared here", Function);
-        }
-    }
-
-protected:
-    std::set<clang::FunctionDecl const *> Functions;
-};
-
-
-class DebugVariableDeclarations
-    : public ModuleVisitor {
-private:
-    void OnFunctionDecl(clang::FunctionDecl const * const F) override {
-        for (auto && Variable: GetVariablesFromContext(F)) {
-            Results.insert(Variable);
-        }
-    }
-
-    void OnCXXMethodDecl(clang::CXXMethodDecl const * const F) override {
-        for (auto && Variable: GetVariablesFromContext(F, (! IsJustAMethod(F)))) {
-            Results.insert(Variable);
-        }
-        clang::CXXRecordDecl const * const Parent = F->getParent();
-        auto const Declaration = Parent->hasDefinition() ? Parent->getDefinition() : Parent->getCanonicalDecl();
-        for (auto && Variable: GetVariablesFromRecord(Declaration)) {
-            Results.insert(Variable);
-        }
-    }
-
-    void Dump(clang::DiagnosticsEngine & DE) const override {
-        for (auto && Result: Results) {
-            EmitNoteMessage(DE, "variable '%0' declared here", Result);
-        }
-    }
-
-private:
-    Variables Results;
-};
-
-
-class DebugVariableUsages
-    : public DebugFunctionDeclarations {
-private:
-    static void ReportVariableUsage(clang::DiagnosticsEngine & DE, clang::FunctionDecl const * const F) {
-        ScopeAnalysis const & Analysis = ScopeAnalysis::AnalyseThis(*(F->getBody()));
-        Analysis.DebugReferenced(DE);
-    }
-
-    void Dump(clang::DiagnosticsEngine & DE) const override {
-        for (auto && Function: Functions) {
-            ReportVariableUsage(DE, Function);
-        }
-    }
-};
-
-
-class DebugVariableChanges
-    : public DebugFunctionDeclarations {
-private:
-    static void ReportVariableUsage(clang::DiagnosticsEngine & DE, clang::FunctionDecl const * const F) {
-        ScopeAnalysis const & Analysis = ScopeAnalysis::AnalyseThis(*(F->getBody()));
-        Analysis.DebugChanged(DE);
-    }
-
-    void Dump(clang::DiagnosticsEngine & DE) const override {
-        for (auto && Function: Functions) {
-            ReportVariableUsage(DE, Function);
-        }
-    }
-};
-
-
-class AnalyseVariableUsage
-    : public ModuleVisitor {
-private:
-    void OnFunctionDecl(clang::FunctionDecl const * const F) override {
+    void OnFunctionDecl(clang::FunctionDecl const * const F) {
         ScopeAnalysis const & Analysis = ScopeAnalysis::AnalyseThis(*(F->getBody()));
         for (auto && Variable: GetVariablesFromContext(F)) {
             State.Eval(Analysis, Variable);
         }
     }
 
-    void OnCXXMethodDecl(clang::CXXMethodDecl const * const F) override {
+    void OnCXXMethodDecl(clang::CXXMethodDecl const * const F) {
         clang::CXXRecordDecl const * const Parent = F->getParent();
         clang::CXXRecordDecl const * const RecordDecl =
             Parent->hasDefinition() ? Parent->getDefinition() : Parent->getCanonicalDecl();
         Variables const MemberVariables = GetMemberVariablesAndReferences(RecordDecl, F);
         // check variables first,
         ScopeAnalysis const & Analysis = ScopeAnalysis::AnalyseThis(*(F->getBody()));
-        for (auto && Variable: GetVariablesFromContext(F, (! IsJustAMethod(F)))) {
+        for (auto && Variable: GetVariablesFromContext(F, (!CanThisMethodSignatureChange(F)))) {
             State.Eval(Analysis, Variable);
         }
         for (auto && Variable: MemberVariables) {
@@ -263,7 +147,7 @@ private:
         if ((! F->isVirtual()) &&
             (! F->isStatic()) &&
             F->isUserProvided() &&
-            IsJustAMethod(F)
+                CanThisMethodSignatureChange(F)
         ) {
             Methods const MemberFunctions = GetMethodsFromRecord(RecordDecl);
             for (auto && Variable: MemberVariables) {
@@ -296,7 +180,7 @@ private:
         }
     }
 
-    void Dump(clang::DiagnosticsEngine & DE) const override {
+    void Dump(clang::DiagnosticsEngine & DE) const {
         State.GenerateReports(DE);
         for (auto && Candidate: ConstCandidates) {
             if (IsFromMainModule(Candidate)) {
@@ -327,39 +211,16 @@ private:
     Methods StaticCandidates;
 };
 
-
-ModuleVisitor::Ptr ModuleVisitor::CreateVisitor(Target const State) {
-    switch (State) {
-    case FunctionDeclaration :
-        return ModuleVisitor::Ptr( new DebugFunctionDeclarations() );
-    case VariableDeclaration :
-        return ModuleVisitor::Ptr( new DebugVariableDeclarations() );
-    case VariableChanges:
-        return ModuleVisitor::Ptr( new DebugVariableChanges() );
-    case VariableUsages :
-        return ModuleVisitor::Ptr( new DebugVariableUsages() );
-    case PseudoConstness :
-        return ModuleVisitor::Ptr( new AnalyseVariableUsage() );
-    }
-}
-
 } // namespace anonymous
 
 
 ModuleAnalysis::ModuleAnalysis(clang::CompilerInstance const &Compiler)
     : clang::ASTConsumer()
     , Reporter(Compiler.getDiagnostics())
-    , State(PseudoConstness)
-{ }
-
-ModuleAnalysis::ModuleAnalysis(clang::CompilerInstance const &Compiler, Target const T)
-    : clang::ASTConsumer()
-    , Reporter(Compiler.getDiagnostics())
-    , State(T)
 { }
 
 void ModuleAnalysis::HandleTranslationUnit(clang::ASTContext & Ctx) {
-    ModuleVisitor::Ptr const V = ModuleVisitor::CreateVisitor(State);
-    V->TraverseDecl(Ctx.getTranslationUnitDecl());
-    V->Dump(Reporter);
+    std::unique_ptr<PseudoConstnessAnalysis> Visitor = std::make_unique<PseudoConstnessAnalysis>();
+    Visitor->TraverseDecl(Ctx.getTranslationUnitDecl());
+    Visitor->Dump(Reporter);
 }

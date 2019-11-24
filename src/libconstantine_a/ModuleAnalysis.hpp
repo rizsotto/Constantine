@@ -22,19 +22,10 @@
 #include <clang/AST/ASTConsumer.h>
 #include <clang/Frontend/CompilerInstance.h>
 
-enum Target
-    { FunctionDeclaration
-    , VariableDeclaration
-    , VariableChanges
-    , VariableUsages
-    , PseudoConstness
-    };
-
 // It runs the pseudo const analysis on the given translation unit.
 class ModuleAnalysis : public clang::ASTConsumer {
 public:
     ModuleAnalysis(clang::CompilerInstance const &);
-    ModuleAnalysis(clang::CompilerInstance const &, Target);
 
     void HandleTranslationUnit(clang::ASTContext &) override;
 
@@ -44,5 +35,4 @@ public:
 
 private:
     clang::DiagnosticsEngine & Reporter;
-    Target const State;
 };

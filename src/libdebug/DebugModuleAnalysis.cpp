@@ -41,7 +41,7 @@ void EmitNoteMessage(clang::DiagnosticsEngine & DE, char const (&Message)[N], cl
     DB.setForceEmit();
 }
 
-bool IsJustAMethod(clang::CXXMethodDecl const * const F) {
+bool CanThisMethodSignatureChange(clang::CXXMethodDecl const * const F) {
     return
         (F->isUserProvided())
     &&  (! F->isVirtual())
@@ -121,7 +121,7 @@ private:
     }
 
     void OnCXXMethodDecl(clang::CXXMethodDecl const * const F) override {
-        for (auto && Variable: GetVariablesFromContext(F, (! IsJustAMethod(F)))) {
+        for (auto && Variable: GetVariablesFromContext(F, (!CanThisMethodSignatureChange(F)))) {
             Results.insert(Variable);
         }
         clang::CXXRecordDecl const * const Parent = F->getParent();
