@@ -22,7 +22,6 @@
 #include "../libconstantine_a/DeclarationCollector.hpp"
 #include "../libconstantine_a/ScopeAnalysis.hpp"
 
-#include <functional>
 #include <memory>
 
 #include <clang/AST/AST.h>
@@ -52,21 +51,38 @@ bool CanThisMethodSignatureChange(clang::CXXMethodDecl const * const F) {
 }
 
 
-// Base class for analysis. Implement function declaration visitor, which visit
-// functions only once. The traversal algorithm is calling all methods, which is
-// not desired. In case of a CXXMethodDecl, it was calling the VisitFunctionDecl
-// and the VisitCXXMethodDecl as well. This dispatching is reworked in this class.
-class ModuleVisitor
-    : public clang::RecursiveASTVisitor<ModuleVisitor> {
+class DebugFunctionDeclarations
+        : public clang::RecursiveASTVisitor<DebugFunctionDeclarations> {
 public:
-    typedef std::unique_ptr<ModuleVisitor> Ptr;
+    explicit DebugFunctionDeclarations(clang::DiagnosticsEngine & DE)
+            : clang::RecursiveASTVisitor<DebugFunctionDeclarations>()
+            , Diagnostics(DE)
+    {}
 
-    static ModuleVisitor::Ptr CreateVisitor(Target);
+    bool VisitFunctionDecl(clang::FunctionDecl const * const F) {
+        if (F->isThisDeclarationADefinition()) {
+            EmitNoteMessage(Diagnostics, "function '%0' declared here", F);
+        }
+        return true;
+    }
 
-    virtual ~ModuleVisitor() = default;
+private:
+    clang::DiagnosticsEngine & Diagnostics;
+};
 
+
+class DebugVariableDeclarations
+        : public clang::RecursiveASTVisitor<DebugVariableDeclarations> {
 public:
-    // public visitor method.
+    DebugVariableDeclarations()
+            : clang::RecursiveASTVisitor<DebugVariableDeclarations>()
+            , Results()
+    {}
+
+    // Implement function declaration visitor, which visit functions only once.
+    // The traversal algorithm is calling all methods, which is not desired.
+    // In case of a CXXMethodDecl, it was calling the VisitFunctionDecl and
+    // the VisitCXXMethodDecl as well. This dispatching is reworked in this class.
     bool VisitFunctionDecl(clang::FunctionDecl const * const F) {
         if (! (F->isThisDeclarationADefinition()))
             return true;
@@ -79,48 +95,13 @@ public:
         return true;
     }
 
-public:
-    // interface methods with different visibilities.
-    virtual void Dump(clang::DiagnosticsEngine &) const = 0;
-
-protected:
-    virtual void OnFunctionDecl(clang::FunctionDecl const *) = 0;
-    virtual void OnCXXMethodDecl(clang::CXXMethodDecl const *) = 0;
-};
-
-
-class DebugFunctionDeclarations
-    : public ModuleVisitor {
-protected:
-    void OnFunctionDecl(clang::FunctionDecl const * const F) override {
-        Functions.insert(F);
-    }
-
-    void OnCXXMethodDecl(clang::CXXMethodDecl const * const F) override {
-        Functions.insert(F);
-    }
-
-    void Dump(clang::DiagnosticsEngine & DE) const override {
-        for (auto && Function: Functions) {
-            EmitNoteMessage(DE, "function '%0' declared here", Function);
-        }
-    }
-
-protected:
-    std::set<clang::FunctionDecl const *> Functions;
-};
-
-
-class DebugVariableDeclarations
-    : public ModuleVisitor {
-private:
-    void OnFunctionDecl(clang::FunctionDecl const * const F) override {
+    void OnFunctionDecl(clang::FunctionDecl const * const F) {
         for (auto && Variable: GetVariablesFromContext(F)) {
             Results.insert(Variable);
         }
     }
 
-    void OnCXXMethodDecl(clang::CXXMethodDecl const * const F) override {
+    void OnCXXMethodDecl(clang::CXXMethodDecl const * const F) {
         for (auto && Variable: GetVariablesFromContext(F, (!CanThisMethodSignatureChange(F)))) {
             Results.insert(Variable);
         }
@@ -131,9 +112,9 @@ private:
         }
     }
 
-    void Dump(clang::DiagnosticsEngine & DE) const override {
+    void Dump(clang::DiagnosticsEngine & Diagnostics) const {
         for (auto && Result: Results) {
-            EmitNoteMessage(DE, "variable '%0' declared here", Result);
+            EmitNoteMessage(Diagnostics, "variable '%0' declared here", Result);
         }
     }
 
@@ -143,49 +124,45 @@ private:
 
 
 class DebugVariableUsages
-    : public DebugFunctionDeclarations {
-private:
-    static void ReportVariableUsage(clang::DiagnosticsEngine & DE, clang::FunctionDecl const * const F) {
-        ScopeAnalysis const & Analysis = ScopeAnalysis::AnalyseThis(*(F->getBody()));
-        Analysis.DebugReferenced(DE);
+        : public clang::RecursiveASTVisitor<DebugVariableUsages> {
+public:
+    explicit DebugVariableUsages(clang::DiagnosticsEngine & DE)
+            : clang::RecursiveASTVisitor<DebugVariableUsages>()
+            , Diagnostics(DE)
+    {}
+
+    bool VisitFunctionDecl(clang::FunctionDecl const * const F) {
+        if (F->isThisDeclarationADefinition()) {
+            ScopeAnalysis const &analysis = ScopeAnalysis::AnalyseThis(*(F->getBody()));
+            analysis.DebugReferenced(Diagnostics);
+        }
+        return true;
     }
 
-    void Dump(clang::DiagnosticsEngine & DE) const override {
-        for (auto && Function: Functions) {
-            ReportVariableUsage(DE, Function);
-        }
-    }
+private:
+    clang::DiagnosticsEngine & Diagnostics;
 };
 
 
 class DebugVariableChanges
-    : public DebugFunctionDeclarations {
-private:
-    static void ReportVariableUsage(clang::DiagnosticsEngine & DE, clang::FunctionDecl const * const F) {
-        ScopeAnalysis const & Analysis = ScopeAnalysis::AnalyseThis(*(F->getBody()));
-        Analysis.DebugChanged(DE);
-    }
+        : public clang::RecursiveASTVisitor<DebugVariableChanges> {
+public:
+    explicit DebugVariableChanges(clang::DiagnosticsEngine & DE)
+            : clang::RecursiveASTVisitor<DebugVariableChanges>()
+            , Diagnostics(DE)
+    {}
 
-    void Dump(clang::DiagnosticsEngine & DE) const override {
-        for (auto && Function: Functions) {
-            ReportVariableUsage(DE, Function);
+    bool VisitFunctionDecl(clang::FunctionDecl const * const F) {
+        if (F->isThisDeclarationADefinition()) {
+            ScopeAnalysis const &Analysis = ScopeAnalysis::AnalyseThis(*(F->getBody()));
+            Analysis.DebugChanged(Diagnostics);
         }
+        return true;
     }
+
+private:
+    clang::DiagnosticsEngine & Diagnostics;
 };
-
-
-ModuleVisitor::Ptr ModuleVisitor::CreateVisitor(Target const State) {
-    switch (State) {
-    case FunctionDeclaration :
-        return ModuleVisitor::Ptr( new DebugFunctionDeclarations() );
-    case VariableDeclaration :
-        return ModuleVisitor::Ptr( new DebugVariableDeclarations() );
-    case VariableChanges:
-        return ModuleVisitor::Ptr( new DebugVariableChanges() );
-    case VariableUsages :
-        return ModuleVisitor::Ptr( new DebugVariableUsages() );
-    }
-}
 
 } // namespace anonymous
 
@@ -197,7 +174,27 @@ DebugModuleAnalysis::DebugModuleAnalysis(clang::CompilerInstance const &Compiler
 { }
 
 void DebugModuleAnalysis::HandleTranslationUnit(clang::ASTContext & Ctx) {
-    ModuleVisitor::Ptr const V = ModuleVisitor::CreateVisitor(State);
-    V->TraverseDecl(Ctx.getTranslationUnitDecl());
-    V->Dump(Reporter);
+    switch (State) {
+        case FunctionDeclaration : {
+            std::unique_ptr<DebugFunctionDeclarations> Visitor = std::make_unique<DebugFunctionDeclarations>(Reporter);
+            Visitor->TraverseDecl(Ctx.getTranslationUnitDecl());
+            break;
+        }
+        case VariableDeclaration: {
+            std::unique_ptr<DebugVariableDeclarations> Visitor = std::make_unique<DebugVariableDeclarations>();
+            Visitor->TraverseDecl(Ctx.getTranslationUnitDecl());
+            Visitor->Dump(Reporter);
+            break;
+        }
+        case VariableChanges: {
+            std::unique_ptr<DebugVariableChanges> Visitor = std::make_unique<DebugVariableChanges>(Reporter);
+            Visitor->TraverseDecl(Ctx.getTranslationUnitDecl());
+            break;
+        }
+        case VariableUsages : {
+            std::unique_ptr<DebugVariableUsages> Visitor = std::make_unique<DebugVariableUsages>(Reporter);
+            Visitor->TraverseDecl(Ctx.getTranslationUnitDecl());
+            break;
+        }
+    }
 }
