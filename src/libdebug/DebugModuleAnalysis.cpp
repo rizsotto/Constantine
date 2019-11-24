@@ -19,6 +19,7 @@
 
 #include "DebugModuleAnalysis.hpp"
 
+#include "../libconstantine_a/IsFromMainModule.hpp"
 #include "../libconstantine_a/DeclarationCollector.hpp"
 #include "../libconstantine_a/ScopeAnalysis.hpp"
 
@@ -38,6 +39,21 @@ void EmitNoteMessage(clang::DiagnosticsEngine & DE, char const (&Message)[N], cl
     clang::DiagnosticBuilder const DB = DE.Report(V->getBeginLoc(), Id);
     DB << V->getNameAsString();
     DB.setForceEmit();
+}
+
+template <unsigned N>
+void EmitNoteMessage(clang::DiagnosticsEngine &DE, const char (&Message)[N], UsageRefsMap::value_type const &Var) {
+    if (!IsFromMainModule(Var.first))
+        return;
+
+    auto const Id = DE.getCustomDiagID(clang::DiagnosticsEngine::Note, Message);
+    auto const & Ls = Var.second;
+    for (auto const &L : Ls) {
+        auto const DB = DE.Report(std::get<1>(L).getBegin(), Id);
+        DB << Var.first->getNameAsString();
+        DB << std::get<0>(L).getAsString();
+        DB.setForceEmit();
+    }
 }
 
 bool CanThisMethodSignatureChange(clang::CXXMethodDecl const * const F) {
@@ -133,8 +149,10 @@ public:
 
     bool VisitFunctionDecl(clang::FunctionDecl const * const F) {
         if (F->isThisDeclarationADefinition()) {
-            ScopeAnalysis const &analysis = ScopeAnalysis::AnalyseThis(*(F->getBody()));
-            analysis.DebugReferenced(Diagnostics);
+            ScopeAnalysis const &Analysis = ScopeAnalysis::AnalyseThis(*(F->getBody()));
+            Analysis.ForEachReferenced([&](auto const Entry) {
+                EmitNoteMessage(Diagnostics, "symbol '%0' was used with type '%1'", Entry);
+            });
         }
         return true;
     }
@@ -155,7 +173,9 @@ public:
     bool VisitFunctionDecl(clang::FunctionDecl const * const F) {
         if (F->isThisDeclarationADefinition()) {
             ScopeAnalysis const &Analysis = ScopeAnalysis::AnalyseThis(*(F->getBody()));
-            Analysis.DebugChanged(Diagnostics);
+            Analysis.ForEachChanged([&](auto const Entry) {
+                EmitNoteMessage(Diagnostics, "variable '%0' with type '%1' was changed", Entry);
+            });
         }
         return true;
     }

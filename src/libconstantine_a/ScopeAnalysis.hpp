@@ -22,6 +22,7 @@
 #include <utility>
 #include <list>
 #include <map>
+#include <functional>
 
 #include <clang/AST/AST.h>
 
@@ -40,8 +41,8 @@ public:
     bool WasChanged(clang::DeclaratorDecl const *) const;
     bool WasReferenced(clang::DeclaratorDecl const *) const;
 
-    void DebugChanged(clang::DiagnosticsEngine &) const;
-    void DebugReferenced(clang::DiagnosticsEngine &) const;
+    void ForEachChanged(std::function<void(UsageRefsMap::value_type const &)> const & Function) const;
+    void ForEachReferenced(std::function<void(UsageRefsMap::value_type const &)> const & Function) const;
 
 public:
     ScopeAnalysis() = default;

@@ -19,7 +19,6 @@
 
 #include "ScopeAnalysis.hpp"
 #include "IsCXXThisExpr.hpp"
-#include "IsFromMainModule.hpp"
 
 #include <clang/AST/RecursiveASTVisitor.h>
 #include <clang/Basic/Diagnostic.h>
@@ -112,23 +111,6 @@ void Register(UsageRefsMap & Results,
 
     UsageExtractor Visitor(Results, Type);
     Visitor.TraverseStmt(const_cast<clang::Stmt*>(Stmt));
-}
-
-template <unsigned N>
-void DumpUsageMapEntry(UsageRefsMap::value_type const & Var
-           , char const (&Message)[N]
-           , clang::DiagnosticsEngine & DE) {
-    if (!IsFromMainModule(Var.first))
-        return;
-
-    auto const Id = DE.getCustomDiagID(clang::DiagnosticsEngine::Note, Message);
-    auto const & Ls = Var.second;
-    for (auto const &L : Ls) {
-        auto const DB = DE.Report(std::get<1>(L).getBegin(), Id);
-        DB << Var.first->getNameAsString();
-        DB << std::get<0>(L).getAsString();
-        DB.setForceEmit();
-    }
 }
 
 
@@ -296,14 +278,14 @@ bool ScopeAnalysis::WasReferenced(clang::DeclaratorDecl const * const Decl) cons
     return (Used.end() != Used.find(Decl));
 }
 
-void ScopeAnalysis::DebugChanged(clang::DiagnosticsEngine & DE) const {
-    for (auto const &Entry : Changed) {
-        DumpUsageMapEntry(Entry, "variable '%0' with type '%1' was changed", DE);
+void ScopeAnalysis::ForEachChanged(std::function<void(UsageRefsMap::value_type const &)> const &Function) const {
+    for (auto && Entry: Changed) {
+        Function(Entry);
     }
 }
 
-void ScopeAnalysis::DebugReferenced(clang::DiagnosticsEngine & DE) const {
-    for (auto const &Entry : Used) {
-        DumpUsageMapEntry(Entry, "symbol '%0' was used with type '%1'", DE);
+void ScopeAnalysis::ForEachReferenced(std::function<void(UsageRefsMap::value_type const &)> const &Function) const {
+    for (auto && Entry: Used) {
+        Function(Entry);
     }
 }
