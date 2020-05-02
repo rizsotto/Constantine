@@ -58,7 +58,7 @@ clang::Expr const * StripExpr(clang::Expr const * E) {
             continue;
         }
         if (auto const M = clang::dyn_cast<clang::MaterializeTemporaryExpr const>(E)) {
-            E = M->GetTemporaryExpr();
+            E = M->getSubExpr();
             continue;
         }
         if (auto const ASE = clang::dyn_cast<clang::ArraySubscriptExpr const>(E)) {
