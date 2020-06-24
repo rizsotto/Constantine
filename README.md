@@ -15,7 +15,7 @@ How to build
 ------------
 
 Constantine was tested on Linux only.
-For Unbuntu/Debian build, you can take a look at the `.travis.yml` file.
+For Unbuntu/Debian build, you can take a look at the github workflow file.
 
 ### Prerequisites
 
