@@ -3,28 +3,26 @@ name: continuous integration
 on: [push, pull_request]
 
 jobs:
-
   build:
-
     runs-on: ${{ matrix.os }}
-
     strategy:
       matrix:
-        os: [ubuntu-18.04]
+        os: [ubuntu-20.04]
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
         with:
           submodules: recursive
+
       - name: Install package dependencies
         if:  startsWith( matrix.os, 'ubuntu' )
         run: |
           wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | sudo apt-key add -
-          sudo add-apt-repository 'deb http://apt.llvm.org/bionic/   llvm-toolchain-bionic-10    main'
-
+          sudo add-apt-repository 'deb https://apt.llvm.org/focal/ llvm-toolchain-focal-12 main'
           sudo apt update --yes
-          sudo apt install --yes --force-yes cmake virtualenv clang-10 libclang-10-dev llvm-10 llvm-10-dev llvm-10-tools
+          sudo apt install --yes --force-yes cmake virtualenv clang-12 libclang-12-dev llvm-12 llvm-12-dev llvm-12-tools
+
       - name: Install python test dependencies
         run: |
           virtualenv -p python3 "$HOME/venv"
@@ -32,10 +30,12 @@ jobs:
           pip --version
           pip install --upgrade pip
           pip install lit
+
       - name: Configure
         run: |
           source "$HOME/venv/bin/activate"
-          cmake -B "$HOME" -S "$GITHUB_WORKSPACE" -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCPACK_GENERATOR="TGZ;DEB" -DCMAKE_CXX_COMPILER="clang++-10"
+          cmake -B "$HOME" -S "$GITHUB_WORKSPACE" -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCPACK_GENERATOR="TGZ;DEB" -DCMAKE_CXX_COMPILER="clang++-12"
+
       - name: Build and Test
         env:
           CTEST_OUTPUT_ON_FAILURE: 1
@@ -45,6 +45,7 @@ jobs:
           cmake --build "$HOME"
           cmake --build "$HOME" --target check
           cmake --build "$HOME" --target package
+
       - name: Install
         env:
           VERBOSE: 1
